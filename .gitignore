@@ -2,5 +2,7 @@ __pycache__
 .venv
 tg_files.db
 tgcloud_session.session
+tgcloud_session.session-journal
 uploaded_files
 .env
+TODO.md

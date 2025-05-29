@@ -1,72 +1,77 @@
-Tu proyecto de FastAPI tiene una estructura bastante buena para un inicio. Ya separaste módulos importantes como `api`, `core`, y `TgCloud`, y tienes archivos para configuración, endpoints, y modelos de base de datos. Aquí algunos consejos para mejorar la organización y prepararlo para escalar:
+# TODO - TgCloudAPI
 
-### Cosas positivas de tu estructura:
-- Separación de la lógica de API, configuración y base de datos.
-- Uso de routers para los endpoints.
-- Carpeta para tests.
-- Uso de un archivo de configuración centralizado.
+## Organización y Estructura
 
-### Sugerencias para mejorar la organización
+- [x] Separar modelos y esquemas (usar `schemas.py` para Pydantic)
+- [x] Crear carpeta `services` para lógica de negocio
+- [ ] Crear carpeta/archivo `dependencies` para dependencias reutilizables (DB, autenticación, etc)
+- [ ] Crear archivo/carpeta `exceptions` para gestión centralizada de errores personalizados
+- [ ] Añadir scripts de inicialización/migración de base de datos (`initial_data.py` o similar)
+- [ ] Añadir y mantener actualizado `requirements.txt` con todas las dependencias
+- [ ] Añadir y mantener actualizado el `README.md` con instrucciones claras
 
-1. **Separar modelos y esquemas**  
-   Si vas a usar Pydantic para validaciones, crea un archivo `schemas.py` en app para los modelos de entrada/salida de la API.
+## Seguridad
 
-2. **Carpeta `services` o `crud`**  
-   Para lógica de negocio o acceso a datos, crea una carpeta `services` o `crud` para no mezclar lógica de negocio con endpoints.
+- [ ] Implementar autenticación (API Key, OAuth2, JWT, etc)
+- [ ] Añadir autorización/roles si es necesario
+- [ ] Validar tamaño y tipo de archivos subidos
+- [ ] Proteger endpoints críticos (subida, descarga, borrado)
 
-3. **Carpeta `dependencies`**  
-   Si usas dependencias de FastAPI (por ejemplo, para autenticación o acceso a la base de datos), crea un archivo/carpeta `dependencies`.
+## Lógica de negocio y API
 
-4. **Gestión de excepciones**  
-   Un archivo `exceptions.py` o un manejador global de errores ayuda a centralizar la gestión de errores personalizados.
+- [ ] Endpoint para listar archivos por carpeta, nombre, fecha, etc (paginación)
+- [ ] Endpoint para borrar archivos (tanto en Telegram como en la base de datos)
+- [ ] Endpoint para actualizar metadatos de archivos
+- [ ] Endpoint para crear/borrar carpetas virtuales
+- [ ] Endpoint para obtener información detallada de un archivo
+- [ ] Endpoint para descargar archivos por ID, nombre, carpeta, etc
+- [ ] Endpoint para subir archivos cifrados (opcional)
+- [ ] Endpoint para compartir archivos (generar enlaces temporales, opcional)
+- [ ] Endpoint para obtener espacio usado/libre (estadísticas)
 
-5. **Configuración por entorno**  
-   Usa variables de entorno y/o un archivo `.env` junto con [python-dotenv](https://pypi.org/project/python-dotenv/) para manejar configuraciones sensibles.
+## Manejo de errores y validaciones
 
-6. **Documentación**  
-   Llena el README.md con instrucciones de instalación, uso y estructura del proyecto.
+- [ ] Validar existencia de archivos antes de subir/descargar
+- [ ] Manejar errores de Telegram (conexión, permisos, etc)
+- [ ] Manejar errores de base de datos (integridad, duplicados, etc)
+- [ ] Devolver mensajes de error claros y consistentes en la API
+- [ ] Añadir logs para operaciones críticas y errores
 
-7. **Scripts de inicialización**  
-   Si tienes lógica de inicialización (como crear tablas), considera un archivo `app/initial_data.py` o scripts de migración.
+## Limpieza y mantenimiento
 
-8. **Tests más organizados**  
-   Divide los tests por módulos, por ejemplo: test_api.py, `tests/test_services.py`, etc.
+- [ ] Script/tarea para limpiar archivos temporales huérfanos (descargas incompletas, etc)
+- [ ] Script/tarea para sincronizar base de datos con Telegram (verificar archivos existentes)
+- [ ] Script/tarea para migraciones de base de datos
 
-9. **Tipado y linting**  
-   Usa herramientas como `mypy` y `flake8` para mantener la calidad del código.
+## Tests
 
-### Ejemplo de estructura sugerida
+- [ ] Añadir tests unitarios para servicios y lógica de negocio
+- [ ] Añadir tests de integración para endpoints principales
+- [ ] Añadir tests de carga para subida/descarga de archivos grandes
+- [ ] Añadir mocks para pruebas sin Telegram real
 
-```
-app/
-    api/
-        endpoints.py
-        __init__.py
-    core/
-        config.py
-        __init__.py
-    TgCloud/
-        client.py
-        files_db.py
-        __init__.py
-    models.py
-    schemas.py
-    services/
-        file_service.py
-    dependencies.py
-    exceptions.py
-    __init__.py
-tests/
-    test_api.py
-    test_services.py
-main.py
-requirements.txt
-README.md
-```
+## Calidad de código
 
-### Recursos
+- [ ] Añadir tipado estricto (`mypy`)
+- [ ] Añadir linting (`flake8`, `black`)
+- [ ] Añadir pre-commit hooks para calidad de código
+- [ ] Añadir docstrings y comentarios en funciones y endpoints
 
-- [FastAPI Project Structure Best Practices](https://fastapi.tiangolo.com/tutorial/bigger-applications/)
-- [12 Factor App](https://12factor.net/)
+## Documentación
 
-Si sigues estas recomendaciones, tu proyecto será más mantenible y escalable a medida que crezca.
+- [ ] Mejorar y mantener la documentación en `README.md`
+- [ ] Añadir ejemplos de uso de la API (curl, http, etc)
+- [ ] Documentar variables de entorno y configuración
+- [ ] Documentar estructura de carpetas y archivos
+
+## DevOps y despliegue
+
+- [ ] Añadir Dockerfile y docker-compose para despliegue fácil
+- [ ] Añadir scripts de despliegue (opcional)
+- [ ] Añadir configuración para despliegue en servicios cloud (Heroku, Azure, etc)
+- [ ] Añadir CI/CD para tests y despliegue automático
+
+---
+
+**Nota:**  
+Este TODO es una guía completa para evolucionar tu proyecto desde una fase beta a un sistema robusto, seguro y mantenible.

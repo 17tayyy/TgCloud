@@ -1,89 +1,95 @@
 # TgCloudAPI
 
-**TgCloudAPI** es una API basada en FastAPI que permite subir archivos a Telegram y gestionarlos como si fuera un sistema de almacenamiento en la nube, usando canales o chats de Telegram como backend de almacenamiento.
+**TgCloudAPI** is a FastAPI-based API that allows you to upload files to Telegram and manage them as if it were a cloud storage system, using Telegram channels or chats as the storage backend.
 
-## Características
+## Features
 
-- Subida de archivos a Telegram mediante la API de Telethon.
-- Gestión de archivos por carpetas virtuales.
-- Base de datos para registrar metadatos de los archivos subidos.
-- Endpoints REST para interactuar con el sistema.
-- Configuración sencilla mediante variables de entorno.
+- Upload files to Telegram using the Telethon API.
+- Manage files by virtual folders.
+- Database to store metadata of uploaded files.
+- REST endpoints to interact with the system.
+- Easy configuration via environment variables.
 
-## Estructura del Proyecto
+## Project Structure
 
 ```
 app/
 ├── TgCloud/
-│   ├── client.py         # Lógica para subir archivos a Telegram y registrar en la base de datos
-│   ├── files_db.py       # Modelos y conexión a la base de datos
+│   ├── client.py         # Logic for uploading/downloading files to/from Telegram and registering in the database
+│   ├── files_db.py       # Database models and connection
 │   └── __init__.py
 ├── api/
-│   ├── endpoints.py      # Endpoints principales de la API
+│   ├── endpoints.py      # Main API endpoints
 │   └── __init__.py
 ├── core/
-│   ├── config.py         # Configuración de la aplicación (API keys, chat ID, etc)
+│   ├── config.py         # App configuration (API keys, chat ID, etc)
 │   └── __init__.py
+├── services/
+│   └── file_service.py   # Business logic for files
+├── schemas.py            # Pydantic schemas for validation and serialization
 ├── __init__.py
-main.py                   # Punto de entrada de la aplicación FastAPI
+main.py                   # FastAPI application entry point
 tests/
-└── test_api.py           # Pruebas unitarias básicas
+└── test_api.py           # Basic unit tests
 ```
 
-## Instalación
+## Installation
 
-1. **Clona el repositorio:**
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/17tayyy/TgCloudAPI.git
    cd TgCloudAPI
    ```
 
-2. **Instala las dependencias:**
+2. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Configura las variables de entorno:**
-   Crea un archivo `.env` en la raíz del proyecto con el siguiente contenido:
+3. **Configure environment variables:**
+   Create a `.env` file in the project root with the following content:
    ```
-    API_ID=tu_api_id
-    API_HASH=tu_api_hash
-    CHAT_ID=-tu_chat_id
+   TG_API_ID=your_api_id
+   TG_API_HASH=your_api_hash
+   TG_CHAT_ID=-your_chat_id
+   PROJECT_NAME=TgCloudAPI
+   API_V1_STR=/api/v1
    ```
 
-4. **Inicia la aplicación:**
+4. **Start the application:**
    ```bash
    uvicorn main:app --reload
    ```
 
-## Uso
+## Usage
 
-- Accede a la documentación interactiva en [http://localhost:8000/docs](http://localhost:8000/docs)
-- Usa los endpoints para subir y gestionar archivos.
+- Access the interactive documentation at [http://localhost:8000/docs](http://localhost:8000/docs)
+- Use the endpoints to upload and manage files.
 
-## Endpoints principales
+## Main Endpoints
 
-- `POST /upload/` — Sube un archivo a Telegram y lo registra en la base de datos.
-- `GET /files/` — Lista los archivos subidos.
-- `GET /files/{file_id}` — Obtiene información de un archivo específico.
+- `POST /api/v1/files/upload` — Upload a file to Telegram and register it in the database.
+- `GET /api/v1/files/download/{filename}` — Download a file from Telegram by name.
+- (Coming soon) `GET /api/v1/files/` — List uploaded files.
+- (Coming soon) `GET /api/v1/files/{file_id}` — Get information about a specific file.
 
-## Requisitos
+## Requirements
 
 - Python 3.8+
-- Una cuenta de Telegram y un canal/chat para usar como almacenamiento
-- API ID y Hash de Telegram (https://my.telegram.org)
+- A Telegram account and a channel/chat to use as storage
+- Telegram API ID and Hash (https://my.telegram.org)
 
 ## Tests
 
-Ejecuta los tests con:
+Run the tests with:
 ```bash
 pytest
 ```
 
-## Licencia
+## License
 
 MIT
 
 ---
 
-**Nota:** Este proyecto está en desarrollo y puede cambiar su estructura y endpoints en el futuro.
+**Note:** This project is under development and its structure and endpoints may change in the future.
