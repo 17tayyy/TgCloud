@@ -1,0 +1,6 @@
+__pycache__
+.venv
+tg_files.db
+tgcloud_session.session
+uploaded_files
+.env
