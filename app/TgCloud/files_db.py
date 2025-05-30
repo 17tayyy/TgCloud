@@ -20,5 +20,11 @@ class File(Base):
     original_name = Column(String)
     uploaded_at = Column(DateTime, default=datetime.now())
 
+class Folder(Base):
+    __tablename__ = "folders"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    created_at = Column(DateTime, default=datetime.now())
+
 def init_db():
     Base.metadata.create_all(bind=engine)

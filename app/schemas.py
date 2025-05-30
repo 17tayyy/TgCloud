@@ -9,6 +9,9 @@ class FileBase(BaseModel):
     encrypted: bool
     original_name: str
 
+class FolderCreate(BaseModel):
+    folder: str
+
 class FileCreate(FileBase):
     pass
 
