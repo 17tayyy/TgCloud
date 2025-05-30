@@ -6,9 +6,10 @@
 
 - Upload files to Telegram using the Telethon API.
 - Manage files by virtual folders.
-- Database to store metadata of uploaded files.
+- Database to store metadata of uploaded files and folders.
 - REST endpoints to interact with the system.
 - Easy configuration via environment variables.
+- Bash script for API testing with curl.
 
 ## Project Structure
 
@@ -16,10 +17,10 @@
 app/
 ├── TgCloud/
 │   ├── client.py         # Logic for uploading/downloading files to/from Telegram and registering in the database
-│   ├── files_db.py       # Database models and connection
+│   ├── files_db.py       # Database models and connection (File, Folder, etc.)
 │   └── __init__.py
 ├── api/
-│   ├── endpoints.py      # Main API endpoints
+│   ├── endpoints.py      # Main API endpoints (upload, download, folder management)
 │   └── __init__.py
 ├── core/
 │   ├── config.py         # App configuration (API keys, chat ID, etc)
@@ -30,7 +31,7 @@ app/
 ├── __init__.py
 main.py                   # FastAPI application entry point
 tests/
-└── test_api.py           # Basic unit tests
+│   └── tests.sh          # Bash script for API endpoint testing with curl
 ```
 
 ## Installation
@@ -70,8 +71,10 @@ tests/
 
 - `POST /api/v1/files/upload` — Upload a file to Telegram and register it in the database.
 - `GET /api/v1/files/download/{filename}` — Download a file from Telegram by name.
-- (Coming soon) `GET /api/v1/files/` — List uploaded files.
-- (Coming soon) `GET /api/v1/files/{file_id}` — Get information about a specific file.
+- `GET /api/v1/files/` — List all uploaded files.
+- `GET /api/v1/files/{filename}` — Get information about a specific file.
+- `GET /api/v1/files/folder/{foldername}` — List files in a specific folder.
+- `POST /api/v1/files/folder/create` — Create a new virtual folder.
 
 ## Requirements
 
@@ -79,12 +82,15 @@ tests/
 - A Telegram account and a channel/chat to use as storage
 - Telegram API ID and Hash (https://my.telegram.org)
 
-## Tests
+## API Testing
 
-Run the tests with:
+You can test the API endpoints using the provided bash script:
+
 ```bash
-pytest
+./tests/tests.sh
 ```
+
+Or use Postman, HTTPie, or curl manually.
 
 ## License
 
