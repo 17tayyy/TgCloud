@@ -30,43 +30,47 @@ function print_result() {
     fi
 }
 
-print_title "📁 Crear carpeta 'testfolder'"
+print_title "📁 Create folder 'testfolder'"
 curl -s -X POST "$API_URL/files/folder/create" \
     -H "Content-Type: application/json" \
     -d '{"folder":"testfolder"}' | jq .
-print_result $? "Carpeta creada (o ya existente)"
+print_result $? "Folder created (or already exists)"
 
-print_title "📄 Listar todos los archivos"
+print_title "📄 List all files"
 curl -s "$API_URL/files/" | jq .
-print_result $? "Archivos listados correctamente"
+print_result $? "Files listed successfully"
 
-print_title "📤 Subir archivo 'test.txt' sin carpeta (default)"
+print_title "📤 Upload file 'test.txt' without folder (default)"
 curl -s -F "file=@/home/tay/Desktop/Projects/TelegramCloudSystem/TgCloudCLI/downloads/test.txt" "$API_URL/files/upload" | jq .
-print_result $? "Archivo subido correctamente"
+print_result $? "File uploaded successfully"
 
-print_title "📤 Subir archivo 'test.txt' a 'testfolder'"
+print_title "📤 Upload file 'test.txt' to 'testfolder'"
 curl -s -F "file=@/home/tay/Desktop/Projects/TelegramCloudSystem/TgCloudCLI/downloads/test.txt" -F "folder=testfolder" "$API_URL/files/upload" | jq .
-print_result $? "Archivo subido correctamente"
+print_result $? "File uploaded successfully"
 
-print_title "🔍 Obtener archivo por nombre (test.txt)"
+print_title "📁 Delete file 'test.txt'"
+curl -s -X DELETE "$API_URL/files/test.txt" | jq .
+print_result $? "File deleted successfully"
+
+print_title "🔍 Get file by name (test.txt)"
 curl -s "$API_URL/files/test.txt" | jq .
-print_result $? "Archivo encontrado"
+print_result $? "File found"
 
-print_title "📂 Listar archivos en carpeta 'testfolder'"
+print_title "📂 List files in folder 'testfolder'"
 curl -s "$API_URL/files/folder/testfolder" | jq .
-print_result $? "Archivos listados en la carpeta"
+print_result $? "Files listed in the folder"
 
-print_title "📥 Descargar archivo 'test.txt'"
+print_title "📥 Download file 'test.txt'"
 curl -s -o downloaded_test.txt "$API_URL/files/download/test.txt"
 if [ -f downloaded_test.txt ]; then
-    print_result 0 "Archivo descargado correctamente"
+    print_result 0 "File downloaded successfully"
     rm downloaded_test.txt
 else
-    print_result 1 "Error al descargar el archivo"
+    print_result 1 "Error downloading the file"
 fi
 
-echo -e "\n${BLUE}========= RESUMEN =========${RESET}"
+echo -e "\n${BLUE}========= SUMMARY =========${RESET}"
 echo -e "Total:   $TOTAL_TESTS"
-echo -e "${GREEN}Pasados: $PASSED_TESTS${RESET}"
-echo -e "${RED}Fallidos: $FAILED_TESTS${RESET}"
-echo -e "${BLUE}============================${RESET}\n"
+echo -e "${GREEN}Passed:  $PASSED_TESTS${RESET}"
+echo -e "${RED}Failed:  $FAILED_TESTS${RESET}"
+echo -e "${BLUE}===========================${RESET}\n"

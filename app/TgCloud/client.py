@@ -4,17 +4,16 @@ from .files_db import SessionLocal, File
 from datetime import datetime
 import re
 from app.core.config import settings
-
+from sqlalchemy.orm import Session
 from telethon import TelegramClient
 
 telegram_client = TelegramClient("tgcloud_session", settings.TG_API_ID, settings.TG_API_HASH)
-telegram_client.start()
 chat_id = settings.TG_CHAT_ID
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DOWNLOADS_DIR = os.path.join(BASE_DIR, "downloaded_files")
 
-async def upload_file_to_tgcloud(file_path, folder="default", db_session=None):
+async def upload_file_to_tgcloud(file_path: str, folder: str ="default", db_session: Session = None):
     close_db = False
     if db_session is None:
         db_session = SessionLocal()
@@ -70,7 +69,7 @@ async def upload_file_to_tgcloud(file_path, folder="default", db_session=None):
 
     return db_file
 
-async def download_file_from_tgcloud(filename, folder="default", db_session=None):
+async def download_file_from_tgcloud(filename: str, folder: str ="default", db_session: Session = None):
     close_db = False
 
     if db_session is None:
@@ -106,3 +105,26 @@ async def download_file_from_tgcloud(filename, folder="default", db_session=None
         db_session.close()
 
     return download_path, db_file.original_name
+
+async def delete_file_from_tgcloud(filename: str, folder: str = "default", db_session: Session = None):
+    close_db = False
+    if db_session is None:
+        db_session = SessionLocal()
+        close_db = True
+
+    db_file = db_session.query(File).filter_by(filename=filename, folder=folder).first()
+    if not db_file:
+        if close_db:
+            db_session.close()
+        return False
+
+    await telegram_client.delete_messages(chat_id, db_file.message_id)
+
+    db_session.delete(db_file)
+    db_session.commit()
+
+    if close_db:
+        db_session.close()
+
+    return True
+
