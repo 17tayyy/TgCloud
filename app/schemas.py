@@ -15,6 +15,16 @@ class FolderCreate(BaseModel):
 class FileCreate(FileBase):
     pass
 
+class FolderResponse(BaseModel):
+    id: int
+    name: str
+    file_count: Optional[int] = 0
+    message_ids: Optional[str] = ""
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class FileResponse(FileBase):
     id: int
     message_id: int

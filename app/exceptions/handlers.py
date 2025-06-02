@@ -50,3 +50,13 @@ async def folder_not_found(request: Request, exc: FolderNotFound):
         status_code=404,
         content={"detail": f"Folder '{exc.foldername}' not found"}
     )
+
+class FolderNotDeleted(Exception):
+    def __init__(self, foldername: str):
+        self.foldername = foldername
+
+async def folder_not_deteleted(request: Request, exc: FolderNotDeleted):
+    return JSONResponse(
+        status_code = 500,
+        content={"detail": f"Error while trying to delete the folder '{exc.foldername}'"}
+    )

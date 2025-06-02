@@ -24,6 +24,8 @@ class Folder(Base):
     __tablename__ = "folders"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
+    file_count = Column(Integer)
+    message_ids = Column(String)
     created_at = Column(DateTime, default=datetime.now())
 
 def init_db():

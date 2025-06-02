@@ -1,12 +1,26 @@
-from fastapi import APIRouter, UploadFile, File as FastAPIFile, Form, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File as FastAPIFile, Form, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from fastapi.responses import FileResponse as FastAPIFileResponse
-from app.schemas import FileResponse, FolderCreate
-from app.TgCloud.client import upload_file_to_tgcloud, download_file_from_tgcloud, delete_file_from_tgcloud
+from app.schemas import FileResponse, FolderCreate, FolderResponse
+from app.TgCloud.client import upload_file_to_tgcloud, download_file_from_tgcloud, delete_file_from_tgcloud, delete_folder_from_tgcloud
 from app.TgCloud.files_db import SessionLocal, File, Folder
 from app.dependencies.db import get_db
-from app.services.file_service import get_file_by_filename, get_file_by_id, get_all_files, get_files_in_folder, get_folder_by_name
-from app.exceptions import FileNotFoundException, FileUploadException, FolderAlreadyExistsException, BadNameException, FolderNotFound
+from app.services.file_service import (
+    get_file_by_filename,
+    get_all_files,
+    get_files_in_folder,
+    get_folder_by_name,
+    get_all_folders,
+    get_file_by_id
+)
+from app.exceptions import (
+    FileNotFoundException,
+    FileUploadException,
+    FolderAlreadyExistsException,
+    BadNameException,
+    FolderNotFound,
+    FolderNotDeleted,
+)
 from typing import List
 import shutil
 import re
@@ -24,39 +38,77 @@ def remove_file_from_disk(path: str):
 
 @router.get("/files/", response_model=List[FileResponse])
 async def list_files(db: Session = Depends(get_db)):
-    files = get_all_files(db)
-    return files
+    return get_all_files(db)
 
-@router.get("/files/{filename}", response_model=FileResponse)
-async def list_file(filename: str, db: Session = Depends(get_db)):
-    if INVALID_CHARS.search(filename):
+@router.get("/folders/{folder}/files/", response_model=List[FileResponse])
+async def list_files_in_folder(folder: str, db: Session = Depends(get_db)):
+    if INVALID_CHARS.search(folder):
+        raise BadNameException(folder)
+    return get_files_in_folder(db, folder)
+
+@router.get("/folders/{folder}/files/{filename}", response_model=FileResponse)
+async def get_file_info(folder: str, filename: str, db: Session = Depends(get_db)):
+    if INVALID_CHARS.search(folder) or INVALID_CHARS.search(filename):
         raise BadNameException(filename)
-
-    file = get_file_by_filename(db, filename)
-
+    file = get_file_by_filename(db, filename, folder)
     if not file:
         raise FileNotFoundException(filename)
     return file
 
-@router.delete("/files/{filename}")
-async def remove_file(filename: str, foldername: str ="default", db: Session = Depends(get_db)):
-    if INVALID_CHARS.search(filename):
+@router.post("/folders/{folder}/files/", response_model=FileResponse)
+async def upload_file(
+    folder: str,
+    file: UploadFile = FastAPIFile(...),
+    db: Session = Depends(get_db)
+):
+    if INVALID_CHARS.search(folder):
+        raise BadNameException(folder)
+    folder_exists = get_folder_by_name(db, folder)
+    if not folder_exists:
+        raise FolderNotFound(folder)
+    safe_filename = os.path.basename(file.filename)
+    file_location = os.path.join(UPLOAD_DIR, safe_filename)
+    with open(file_location, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    db_file = await upload_file_to_tgcloud(file_location, folder=folder, db_session=db)
+    if not db_file:
+        raise FileUploadException("Could not save file to the cloud")
+    return db_file
+
+@router.get("/folders/{folder}/files/{filename}/download")
+async def download_file(
+    folder: str,
+    filename: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    if INVALID_CHARS.search(folder) or INVALID_CHARS.search(filename):
         raise BadNameException(filename)
-    
-    deleted = await delete_file_from_tgcloud(filename, folder=foldername, db_session=db)
+    result = await download_file_from_tgcloud(filename, folder, db_session=db)
+    if not result or not result[0]:
+        raise FileNotFoundException(filename)
+    download_path, original_name = result
+    background_tasks.add_task(remove_file_from_disk, download_path)
+    return FastAPIFileResponse(
+        path=download_path,
+        filename=original_name,
+        media_type="application/octet-stream"
+    )
+
+@router.delete("/folders/{folder}/files/{filename}")
+async def delete_file(
+    folder: str,
+    filename: str,
+    db: Session = Depends(get_db)
+):
+    if INVALID_CHARS.search(folder) or INVALID_CHARS.search(filename):
+        raise BadNameException(filename)
+    deleted = await delete_file_from_tgcloud(filename, folder=folder, db_session=db)
     if not deleted:
         raise FileNotFoundException(filename)
-    return {"message": f"File '{filename}' deleted from folder '{foldername}'"}
+    return {"message": f"File '{filename}' deleted from folder '{folder}'"}
 
-@router.get("/files/folder/{foldername}", response_model=List[FileResponse])
-async def list_folder(foldername: str, db: Session = Depends(get_db)):
-    if INVALID_CHARS.search(foldername):
-        raise BadNameException(foldername)
-    
-    files_in_folder = get_files_in_folder(db, foldername)
-    return files_in_folder
-
-@router.post("/files/folder/create")
+@router.post("/folders/")
 async def create_folder(
     folder_data: FolderCreate,
     db: Session = Depends(get_db)
@@ -66,53 +118,32 @@ async def create_folder(
     exists = get_folder_by_name(db, folder_data.folder)
     if exists:
         raise FolderAlreadyExistsException(folder_data.folder)
-
     new_folder = Folder(name=folder_data.folder)
     db.add(new_folder)
     db.commit()
     db.refresh(new_folder)
+    return {"message": f"Folder '{folder_data.folder}' created"}
 
-    return {"message": f"Folder '{create_folder}' created"}
+@router.get("/folders/", response_model=List[FolderResponse])
+async def list_folder(db: Session = Depends(get_db)):
+    return get_all_folders(db)
 
-@router.post("/files/upload", response_model=FileResponse)
-async def upload_file(
-    file: UploadFile = FastAPIFile(...),
-    foldername: str = Form("default"),
-    db: Session = Depends(get_db)
-):
-    if not foldername == "default":
-        folder_exists = get_folder_by_name(db, foldername)
-        if not folder_exists:
-            raise FolderNotFound(foldername)
-
-    safe_filename = os.path.basename(file.filename)
-    file_location = os.path.join(UPLOAD_DIR, safe_filename)
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    db_file = await upload_file_to_tgcloud(file_location, folder=foldername, db_session=db)
-    if not db_file:
-        raise FileUploadException("Could not save file to the cloud")
-    return db_file
-
-@router.get("/files/download/{filename}")
-async def download_file(
-    filename: str,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
-):
-    if INVALID_CHARS.search(filename):
-        raise BadNameException(filename)
+@router.delete("/folders/{folder}/")
+async def delete_folder(folder: str, db: Session = Depends(get_db)):
+    if INVALID_CHARS.search(folder):
+        raise BadNameException(folder)
     
-    result = await download_file_from_tgcloud(filename, db_session=db)
-    if not result:
-        raise FileNotFoundException(filename)
+    folder = get_folder_by_name(db, folder)
+
+    if not folder:
+        raise FolderNotFound(folder)
     
-    download_path, original_name = result
+    deleted = await delete_folder_from_tgcloud(folder.name, db)
 
-    background_tasks.add_task(remove_file_from_disk, download_path)
+    if not deleted:
+        raise FolderNotDeleted(folder.name)
 
-    return FastAPIFileResponse(
-        path=download_path,
-        filename=original_name,
-        media_type="application/octet-stream"
-    )
+    db.delete(folder)
+    db.commit()
+
+    return {"message": f"Folder '{folder.name}' deleted"}

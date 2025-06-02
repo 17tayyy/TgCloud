@@ -4,6 +4,7 @@ from .handlers import (
     FolderAlreadyExistsException, folder_already_exists_exception_handler,
     BadNameException, bad_name_exception_handler,
     FolderNotFound, folder_not_found,
+    FolderNotDeleted, folder_not_deteleted
 )
 
 exception_handlers = [
@@ -12,4 +13,5 @@ exception_handlers = [
     (FolderAlreadyExistsException, folder_already_exists_exception_handler),
     (BadNameException, bad_name_exception_handler),
     (FolderNotFound, folder_not_found),
+    (FolderNotDeleted, folder_not_deteleted)
 ]

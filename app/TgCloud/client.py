@@ -1,6 +1,6 @@
 import os
 from telethon.tl.types import DocumentAttributeFilename
-from .files_db import SessionLocal, File
+from .files_db import SessionLocal, File, Folder
 from datetime import datetime
 import re
 from app.core.config import settings
@@ -37,13 +37,17 @@ async def upload_file_to_tgcloud(file_path: str, folder: str ="default", db_sess
 
     if not telegram_client.is_connected():
         await telegram_client.connect()
-        
+
+    uploaded_file = await telegram_client.upload_file(
+        file_path,
+        part_size_kb=512
+    )
+
     message = await telegram_client.send_file(
         chat_id,
-        file=file_path,
+        file=uploaded_file,
         caption=filename,
         attributes=[DocumentAttributeFilename(filename)],
-        part_size_kb=2048
     )
 
     uploaded_at = message.date if hasattr(message, "date") and message.date else datetime.now()
@@ -60,6 +64,21 @@ async def upload_file_to_tgcloud(file_path: str, folder: str ="default", db_sess
     db_session.add(db_file)
     db_session.commit()
     db_session.refresh(db_file)
+
+    folder = db_session.query(Folder).filter_by(name=folder).first()
+
+    if folder:
+        if folder.message_ids:
+            folder.message_ids += f",{message.id}"
+        else:
+            folder.message_ids = str(message.id)
+        
+        if folder.file_count is None:
+            folder.file_count = 1
+        else:
+            folder.file_count += 1
+        
+        db_session.commit()
 
     if os.path.exists(file_path):
         os.remove(file_path)
@@ -121,6 +140,30 @@ async def delete_file_from_tgcloud(filename: str, folder: str = "default", db_se
     await telegram_client.delete_messages(chat_id, db_file.message_id)
 
     db_session.delete(db_file)
+    db_session.commit()
+
+    if close_db:
+        db_session.close()
+
+    return True
+
+async def delete_folder_from_tgcloud(folder: str, db_session: Session = None):
+    close_db = False
+    if db_session is None:
+        db_session = SessionLocal()
+        close_db = True
+
+    folder_obj = db_session.query(Folder).filter_by(name=folder).first()
+    if not folder_obj or not folder_obj.message_ids:
+        if close_db:
+            db_session.close()
+        return False
+
+    message_ids_parsed = [mid for mid in folder_obj.message_ids.split(",") if mid]
+    for message_id in message_ids_parsed:
+        await telegram_client.delete_messages(chat_id, int(message_id))
+
+    db_session.query(File).filter_by(folder=folder).delete()
     db_session.commit()
 
     if close_db:
