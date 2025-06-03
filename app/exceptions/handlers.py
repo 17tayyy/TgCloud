@@ -38,24 +38,35 @@ class BadNameException(Exception):
 async def bad_name_exception_handler(request: Request, exc: BadNameException):
     return JSONResponse(
         status_code=400,
-        content={"detail": "Bad request (invalid characters)"}
+        content={"detail": f"Invalid name '{exc.name}': contains invalid characters"}
     )
 
-class FolderNotFound(Exception):
+class FolderNotFoundException(Exception):
     def __init__(self, foldername: str):
         self.foldername = foldername
 
-async def folder_not_found(request: Request, exc: FolderNotFound):
+async def folder_not_found_exception_handler(request: Request, exc: FolderNotFoundException):
     return JSONResponse(
         status_code=404,
         content={"detail": f"Folder '{exc.foldername}' not found"}
     )
 
-class FolderNotDeleted(Exception):
+class FileAlreadyExistsException(Exception):
+    def __init__(self, filename: str, foldername: str):
+        self.filename = filename
+        self.foldername = foldername
+
+async def file_already_exists_exception_handler(request: Request, exc: FileAlreadyExistsException):
+    return JSONResponse(
+        status_code=409,
+        content={"detail": f"File '{exc.filename}' already exists in '{exc.foldername}' folder"}
+    )
+
+class FolderNotDeletedException(Exception):
     def __init__(self, foldername: str):
         self.foldername = foldername
 
-async def folder_not_deteleted(request: Request, exc: FolderNotDeleted):
+async def folder_not_deteleted_exception_handler(request: Request, exc: FolderNotDeletedException):
     return JSONResponse(
         status_code = 500,
         content={"detail": f"Error while trying to delete the folder '{exc.foldername}'"}

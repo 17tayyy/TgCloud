@@ -3,8 +3,9 @@ from .handlers import (
     FileUploadException, file_upload_exception_handler,
     FolderAlreadyExistsException, folder_already_exists_exception_handler,
     BadNameException, bad_name_exception_handler,
-    FolderNotFound, folder_not_found,
-    FolderNotDeleted, folder_not_deteleted
+    FolderNotFoundException, folder_not_found_exception_handler,
+    FolderNotDeletedException, folder_not_deteleted_exception_handler,
+    FileAlreadyExistsException, file_already_exists_exception_handler,
 )
 
 exception_handlers = [
@@ -12,6 +13,7 @@ exception_handlers = [
     (FileUploadException, file_upload_exception_handler),
     (FolderAlreadyExistsException, folder_already_exists_exception_handler),
     (BadNameException, bad_name_exception_handler),
-    (FolderNotFound, folder_not_found),
-    (FolderNotDeleted, folder_not_deteleted)
+    (FolderNotFoundException, folder_not_found_exception_handler),
+    (FolderNotDeletedException, folder_not_deteleted_exception_handler),
+    (FileAlreadyExistsException, file_already_exists_exception_handler),
 ]

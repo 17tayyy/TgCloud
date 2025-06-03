@@ -12,6 +12,15 @@ class FileBase(BaseModel):
 class FolderCreate(BaseModel):
     folder: str
 
+class FileRename(BaseModel):
+    new_name: str
+
+class FolderRename(BaseModel):
+    new_name: str
+
+class MoveFile(BaseModel):
+    dest_folder: str
+
 class FileCreate(FileBase):
     pass
 

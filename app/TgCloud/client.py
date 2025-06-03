@@ -113,7 +113,7 @@ async def download_file_from_tgcloud(filename: str, folder: str ="default", db_s
     await telegram_client.download_file(
         message.document,
         file=download_path,
-        part_size_kb=1024
+        part_size_kb=1024*2
     )
 
     if not os.path.exists(download_path):
