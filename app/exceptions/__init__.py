@@ -6,6 +6,8 @@ from .handlers import (
     FolderNotFoundException, folder_not_found_exception_handler,
     FolderNotDeletedException, folder_not_deteleted_exception_handler,
     FileAlreadyExistsException, file_already_exists_exception_handler,
+    IncorrectLoginException, incorrect_login_exception_handler,
+    UsernameAlreadyExists, username_already_exists_exception_handler,
 )
 
 exception_handlers = [
@@ -16,4 +18,6 @@ exception_handlers = [
     (FolderNotFoundException, folder_not_found_exception_handler),
     (FolderNotDeletedException, folder_not_deteleted_exception_handler),
     (FileAlreadyExistsException, file_already_exists_exception_handler),
+    (IncorrectLoginException, incorrect_login_exception_handler),
+    (UsernameAlreadyExists, username_already_exists_exception_handler),
 ]

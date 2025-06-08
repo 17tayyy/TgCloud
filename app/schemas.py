@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict
 
 class FileBase(BaseModel):
     folder: str
@@ -41,3 +41,20 @@ class FileResponse(FileBase):
 
     class Config:
         from_attributes = True
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class MessageResponse(BaseModel):
+    message: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
+class StatsResponse(BaseModel):
+    total_space_used: str
+    total_files: int
+    total_folders: int
+    space_used_for_folder: Dict[str, int]

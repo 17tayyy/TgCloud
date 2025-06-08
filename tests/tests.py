@@ -4,10 +4,30 @@ import os
 
 API_URL = "http://127.0.0.1:8000/api/v1"
 TEST_FILE_PATH = "/home/tay/Desktop/Projects/TelegramCloudSystem/TgCloudCLI/downloads/test.txt"
+TEST_USER = {"username": "testuser", "password": "testpass123"}
 
 @pytest.fixture(scope="module")
-def client():
+def auth_token():
     with httpx.Client(base_url=API_URL) as c:
+        r = c.post("/register", json=TEST_USER)
+        assert r.status_code == 200 or "Username already registered" in r.text
+
+        data = {
+            "grant_type": "password",
+            "username": TEST_USER["username"],
+            "password": TEST_USER["password"],
+            "scope": "",
+            "client_id": "",
+            "client_secret": ""
+        }
+        r = c.post("/token", data=data, headers={"Content-Type": "application/x-www-form-urlencoded"})
+        assert r.status_code == 200
+        token = r.json()["access_token"]
+        return token
+
+@pytest.fixture(scope="module")
+def client(auth_token):
+    with httpx.Client(base_url=API_URL, headers={"Authorization": f"Bearer {auth_token}"}) as c:
         yield c
 
 def test_create_folder(client):
@@ -105,3 +125,11 @@ def test_delete_renamedfolder(client):
     resp = client.delete("/folders/renamedfolder/")
     assert resp.status_code == 200
     assert resp.json()["message"] == "Folder 'renamedfolder' deleted"
+
+def test_stats(client):
+    resp = client.get("/stats/")
+    assert resp.status_code == 200
+    assert "total_space_used" in resp.json()
+    assert "total_files" in resp.json()
+    assert "total_folders" in resp.json()
+    assert "space_used_for_folder" in resp.json()

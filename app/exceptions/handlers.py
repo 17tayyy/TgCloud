@@ -71,3 +71,22 @@ async def folder_not_deteleted_exception_handler(request: Request, exc: FolderNo
         status_code = 500,
         content={"detail": f"Error while trying to delete the folder '{exc.foldername}'"}
     )
+
+class IncorrectLoginException(Exception):
+    pass
+
+async def incorrect_login_exception_handler(request: Request, exc: IncorrectLoginException):
+    return JSONResponse(
+        status_code=401,
+        content={"detail": "Incorrect login credentials"}
+    )
+
+class UsernameAlreadyExists(Exception):
+    def __init__(self, username: str):
+        self.username = username
+
+async def username_already_exists_exception_handler(request: Request, exc: IncorrectLoginException):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Username already registered"}
+    )
