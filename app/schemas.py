@@ -59,3 +59,13 @@ class StatsResponse(BaseModel):
     total_folders: int
     space_used_for_folder: Dict[str, int]
     encryption_enabled: bool
+
+class PhoneRequest(BaseModel):
+    phone: str
+
+class CodeRequest(BaseModel):
+    phone: str
+    code: str
+
+class PasswordRequest(BaseModel):
+    password: str

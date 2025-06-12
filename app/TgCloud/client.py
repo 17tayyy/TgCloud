@@ -5,6 +5,7 @@ from datetime import datetime
 import re
 from app.core.config import settings
 from sqlalchemy.orm import Session
+from app.exceptions import TelegramNotAuthorized
 from telethon import TelegramClient
 from app.utils.encryption import encrypt_file, decrypt_file
 
@@ -14,6 +15,18 @@ chat_id = settings.TG_CHAT_ID
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DOWNLOADS_DIR = os.path.join(BASE_DIR, "downloaded_files")
 
+
+async def ensure_telegram_ready():
+    if not telegram_client.is_connected():
+        await telegram_client.connect()
+
+    session_file = "./tgcloud_session.session"
+    if not os.path.exists(session_file):
+        raise TelegramNotAuthorized()
+    
+    if not await telegram_client.is_user_authorized():
+        raise TelegramNotAuthorized()
+    
 async def upload_file_to_tgcloud(file_path: str, folder: str = "default", db_session: Session = None, username: str = None):
     close_db = False
     if db_session is None:
@@ -181,4 +194,3 @@ async def delete_folder_from_tgcloud(folder: str, db_session: Session = None):
         db_session.close()
 
     return True
-

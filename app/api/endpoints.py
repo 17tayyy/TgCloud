@@ -1,10 +1,13 @@
 from fastapi import APIRouter, UploadFile, File as FastAPIFile, Form, Depends, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from fastapi.responses import FileResponse as FastAPIFileResponse
-from app.schemas import FileResponse, FolderCreate, FolderResponse, FileRename, FolderRename, MoveFile, UserCreate, MessageResponse, TokenResponse, StatsResponse
+from app.schemas import FileResponse, FolderCreate, FolderResponse, FileRename, FolderRename, MoveFile, UserCreate, MessageResponse, TokenResponse, StatsResponse, PasswordRequest, CodeRequest, PhoneRequest
 from app.TgCloud.client import upload_file_to_tgcloud, download_file_from_tgcloud, delete_file_from_tgcloud, delete_folder_from_tgcloud
 from app.TgCloud.files_db import SessionLocal, File, Folder, User, ShareToken
 from app.core.config import settings
+from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError
+from telethon.sessions import StringSession
+from app.TgCloud.client import telegram_client, ensure_telegram_ready
 from app.dependencies.db import get_db
 from app.dependencies.files import human_readable_size
 from app.services.file_service import (
@@ -36,6 +39,7 @@ from app.exceptions import (
     IncorrectLoginException,
     UsernameAlreadyExists,
     TokenNotFoundException,
+    TelegramNotAuthorized,
 )
 from typing import List
 import shutil
@@ -94,6 +98,7 @@ async def download_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    await ensure_telegram_ready()
     validate_names(foldername, filename)
 
     file_db = get_file_by_filename(db, filename, foldername)
@@ -122,6 +127,7 @@ async def upload_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    await ensure_telegram_ready()
     validate_names(foldername)
 
     folder_exists = get_folder_by_name(db, foldername)
@@ -153,6 +159,7 @@ async def delete_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    await ensure_telegram_ready()
     validate_names(foldername, filename)
 
     folder = get_folder_by_name(db, foldername)
@@ -478,6 +485,7 @@ async def download_shared_file(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
+    await ensure_telegram_ready()
     payload, db_token = validate_share_token(db, token, "file")
     folder = payload["folder"]
     filename = payload["filename"]
@@ -514,6 +522,7 @@ async def download_file_from_shared_folder(
     filename: str,
     db: Session = Depends(get_db)
 ):
+    await ensure_telegram_ready()
     payload, db_token = validate_share_token(db, token, "folder")
     folder = payload["folder"]
     file_db = get_file_by_filename(db, filename, folder)
@@ -545,3 +554,42 @@ async def revoke_share_token(
     db_token.revoked = True
     db.commit()
     return {"message": "Share token revoked"}
+
+
+@router.post("/tgcloud/auth/phone", response_model=MessageResponse)
+async def tgcloud_send_phone(data: PhoneRequest):
+    await telegram_client.connect()
+    try:
+        await telegram_client.send_code_request(data.phone)
+        return {"message": "Code sent"}
+    except Exception as e:
+        return {"message": f"Error sending code: {str(e)}"}
+
+@router.post("/tgcloud/auth/verify_code", response_model=MessageResponse)
+async def tgcloud_verify_code(data: CodeRequest):
+    await telegram_client.connect()
+    try:
+        await telegram_client.sign_in(data.phone, data.code)
+        return {"message": "Authenticated"}
+    except SessionPasswordNeededError:
+        return {"message": "Password required"}
+    except PhoneCodeInvalidError:
+        return {"message": "Invalid code"}
+    except Exception as e:
+        return {"message": f"Error verifying code: {str(e)}"}
+
+@router.post("/tgcloud/auth/password", response_model=MessageResponse)
+async def tgcloud_send_password(data: PasswordRequest):
+    await telegram_client.connect()
+    try:
+        await telegram_client.sign_in(password=data.password)
+        return {"message": "Authenticated"}
+    except Exception as e:
+        return {"message": f"Error verifying password: {str(e)}"}
+
+@router.get("/tgcloud/auth/status", response_model=MessageResponse)
+async def tgcloud_auth_status():
+    if await telegram_client.is_user_authorized():
+        return {"message": "Authorized"}
+    else:
+        return {"message": "Not authorized"}

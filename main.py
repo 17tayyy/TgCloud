@@ -9,7 +9,6 @@ from app.exceptions import exception_handlers
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_tg_db()
-    await telegram_client.start()
     yield
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)

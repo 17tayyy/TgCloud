@@ -99,3 +99,12 @@ async def token_not_found_exception_handler(request: Request, exc: TokenNotFound
         status_code=404,
         content={"detail": "Share token not found"}
     )
+
+class TelegramNotAuthorized(Exception):
+    pass
+
+async def telegram_not_authorized_exception_handler(requst: Request, exc: TelegramNotAuthorized):
+    return JSONResponse(
+        status_code=401,
+        content={"detail": "Telegram session not authorized. Please authenticate via /tgcloud/auth endpoints."}
+    )

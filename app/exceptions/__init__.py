@@ -9,6 +9,7 @@ from .handlers import (
     IncorrectLoginException, incorrect_login_exception_handler,
     UsernameAlreadyExists, username_already_exists_exception_handler,
     TokenNotFoundException, token_not_found_exception_handler,
+    TelegramNotAuthorized, telegram_not_authorized_exception_handler,
 )
 
 exception_handlers = [
@@ -22,4 +23,5 @@ exception_handlers = [
     (IncorrectLoginException, incorrect_login_exception_handler),
     (UsernameAlreadyExists, username_already_exists_exception_handler),
     (TokenNotFoundException, token_not_found_exception_handler),
+    (TelegramNotAuthorized, telegram_not_authorized_exception_handler),
 ]
