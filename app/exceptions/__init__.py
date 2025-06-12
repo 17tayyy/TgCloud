@@ -8,6 +8,7 @@ from .handlers import (
     FileAlreadyExistsException, file_already_exists_exception_handler,
     IncorrectLoginException, incorrect_login_exception_handler,
     UsernameAlreadyExists, username_already_exists_exception_handler,
+    TokenNotFoundException, token_not_found_exception_handler,
 )
 
 exception_handlers = [
@@ -20,4 +21,5 @@ exception_handlers = [
     (FileAlreadyExistsException, file_already_exists_exception_handler),
     (IncorrectLoginException, incorrect_login_exception_handler),
     (UsernameAlreadyExists, username_already_exists_exception_handler),
+    (TokenNotFoundException, token_not_found_exception_handler),
 ]

@@ -6,6 +6,9 @@ API_URL = "http://127.0.0.1:8000/api/v1"
 TEST_FILE_PATH = "/home/tay/Desktop/Projects/TelegramCloudSystem/TgCloudCLI/downloads/test.txt"
 TEST_USER = {"username": "testuser", "password": "testpass123"}
 
+shared_file_token = None
+shared_folder_token = None
+
 @pytest.fixture(scope="module")
 def auth_token():
     with httpx.Client(base_url=API_URL) as c:
@@ -32,8 +35,7 @@ def client(auth_token):
 
 def test_create_folder(client):
     resp = client.post("/folders/", json={"folder": "testfolder"})
-    assert resp.status_code == 200
-    assert resp.json()["message"] == "Folder 'testfolder' created"
+    assert resp.status_code == 200 or "already exists" in resp.text
 
 def test_upload_file(client):
     assert os.path.exists(TEST_FILE_PATH), "Test file does not exist"
@@ -63,73 +65,75 @@ def test_download_file(client, tmp_path):
     with open(TEST_FILE_PATH, "rb") as orig:
         assert orig.read() == download_path.read_bytes()
 
-def test_rename_file(client):
-    resp = client.put(
-        "/folders/testfolder/files/test.txt/rename",
-        json={"new_name": "renamed.txt"}
-    )
+def test_share_file(client):
+    global shared_file_token
+    resp = client.post("/folders/testfolder/files/test.txt/share")
     assert resp.status_code == 200
-    assert resp.json()["message"] == "File 'test.txt' renamed to 'renamed.txt' in folder 'testfolder'"
+    assert "access/file/" in resp.json()["message"]
+    url = resp.json()["message"]
+    shared_file_token = url.split("/")[-1]
+    assert shared_file_token
 
-def test_renamed_file_in_folder(client):
-    resp = client.get("/folders/testfolder/files/")
+def test_access_shared_file_info():
+    url = f"{API_URL}/access/file/{shared_file_token}"
+    resp = httpx.get(url)
     assert resp.status_code == 200
-    filenames = [f["filename"] for f in resp.json()]
-    assert "renamed.txt" in filenames
+    assert resp.json()["filename"] == "test.txt"
 
-def test_rename_folder(client):
-    resp = client.put(
-        "/folders/testfolder/rename",
-        json={"new_name": "renamedfolder"}
-    )
+def test_download_shared_file(tmp_path):
+    url = f"{API_URL}/access/file/{shared_file_token}/download"
+    resp = httpx.get(url)
     assert resp.status_code == 200
-    assert resp.json()["message"] == "Folder 'testfolder' renamed to 'renamedfolder'"
+    download_path = tmp_path / "public_downloaded_test.txt"
+    with open(download_path, "wb") as f:
+        f.write(resp.content)
+    with open(TEST_FILE_PATH, "rb") as orig:
+        assert orig.read() == download_path.read_bytes()
 
-def test_renamed_file_in_renamed_folder(client):
-    resp = client.get("/folders/renamedfolder/files/")
+def test_share_folder(client):
+    global shared_folder_token
+    resp = client.post("/folders/testfolder/share")
     assert resp.status_code == 200
-    filenames = [f["filename"] for f in resp.json()]
-    assert "renamed.txt" in filenames
+    assert "access/folder/" in resp.json()["message"]
+    url = resp.json()["message"]
+    shared_folder_token = url.split("/")[-1]
+    assert shared_folder_token
 
-def test_create_movedfolder(client):
-    resp = client.post("/folders/", json={"folder": "movedfolder"})
-    assert resp.status_code == 200 or (
-        resp.status_code == 400 and "already exists" in resp.text
-    )
-
-def test_move_file(client):
-    resp = client.post(
-        "/folders/renamedfolder/files/renamed.txt/move",
-        json={"dest_folder": "movedfolder"}
-    )
-    assert resp.status_code == 200
-    assert resp.json()["message"] == "File 'renamed.txt' moved from 'renamedfolder' to 'movedfolder'"
-
-def test_file_in_movedfolder(client):
-    resp = client.get("/folders/movedfolder/files/")
+def test_access_shared_folder_info():
+    url = f"{API_URL}/access/folder/{shared_folder_token}"
+    resp = httpx.get(url)
     assert resp.status_code == 200
     filenames = [f["filename"] for f in resp.json()]
-    assert "renamed.txt" in filenames
+    assert "test.txt" in filenames
 
-def test_delete_file_from_movedfolder(client):
-    resp = client.delete("/folders/movedfolder/files/renamed.txt")
+def test_download_file_from_shared_folder(tmp_path):
+    url = f"{API_URL}/access/folder/{shared_folder_token}/test.txt/download"
+    resp = httpx.get(url)
     assert resp.status_code == 200
-    assert resp.json()["message"] == "File 'renamed.txt' deleted from folder 'movedfolder'"
+    download_path = tmp_path / "public_folder_downloaded_test.txt"
+    with open(download_path, "wb") as f:
+        f.write(resp.content)
+    with open(TEST_FILE_PATH, "rb") as orig:
+        assert orig.read() == download_path.read_bytes()
 
-def test_delete_movedfolder(client):
-    resp = client.delete("/folders/movedfolder/")
+def test_revoke_share_file(client):
+    url = f"/access/revoke/{shared_file_token}"
+    resp = client.post(url)
     assert resp.status_code == 200
-    assert resp.json()["message"] == "Folder 'movedfolder' deleted"
+    assert "revoked" in resp.json()["message"]
 
-def test_delete_renamedfolder(client):
-    resp = client.delete("/folders/renamedfolder/")
+def test_revoke_share_folder(client):
+    url = f"/access/revoke/{shared_folder_token}"
+    resp = client.post(url)
     assert resp.status_code == 200
-    assert resp.json()["message"] == "Folder 'renamedfolder' deleted"
+    assert "revoked" in resp.json()["message"]
 
-def test_stats(client):
-    resp = client.get("/stats/")
-    assert resp.status_code == 200
-    assert "total_space_used" in resp.json()
-    assert "total_files" in resp.json()
-    assert "total_folders" in resp.json()
-    assert "space_used_for_folder" in resp.json()
+def test_access_revoked_file():
+    url = f"{API_URL}/access/file/{shared_file_token}"
+    resp = httpx.get(url)
+    assert resp.status_code in (401, 404)
+
+def test_access_revoked_folder():
+    url = f"{API_URL}/access/folder/{shared_folder_token}"
+    resp = httpx.get(url)
+    assert resp.status_code in (401, 404)

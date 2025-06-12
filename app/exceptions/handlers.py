@@ -90,3 +90,12 @@ async def username_already_exists_exception_handler(request: Request, exc: Incor
         status_code=400,
         content={"detail": "Username already registered"}
     )
+
+class TokenNotFoundException(Exception):
+        pass
+
+async def token_not_found_exception_handler(request: Request, exc: TokenNotFoundException):
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Share token not found"}
+    )

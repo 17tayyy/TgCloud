@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.TgCloud.files_db import File, Folder, User
+from fastapi import HTTPException
+from app.auth.jwt_auth import create_access_token, decode_access_token
+from datetime import datetime, timedelta
+from app.TgCloud.files_db import File, Folder, User, ShareToken
 from app.exceptions import BadNameException
 import re
 
@@ -56,6 +59,23 @@ def get_all_folders_used_space(db: Session):
 
 def get_used_space(db: Session):
     return db.query(func.sum(File.size)).scalar() or 0
+
+def validate_share_token(db: Session, token: str, expected_type: str):
+    db_token = db.query(ShareToken).filter_by(token=token).first()
+    if not db_token or db_token.revoked:
+        raise HTTPException(status_code=401, detail="Share token revoked or not found")
+    
+    if db_token.expires_at < datetime.now():
+        raise HTTPException(status_code=401, detail="Share token expired")
+    
+    payload = decode_access_token(token)
+    if payload.get("type") != expected_type:
+        raise HTTPException(status_code=400, detail="Invalid share token")
+    
+    return payload, db_token
+
+def get_share_token(token: str, owner: str, db: Session):
+    return db.query(ShareToken).filter_by(token=token, owner=owner).first()
 
 def validate_names(*names):
     for name in names:

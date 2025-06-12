@@ -6,3 +6,4 @@ tgcloud_session.session-journal
 uploaded_files
 .env
 TODO.md
+encryption.key

@@ -58,3 +58,4 @@ class StatsResponse(BaseModel):
     total_files: int
     total_folders: int
     space_used_for_folder: Dict[str, int]
+    encryption_enabled: bool

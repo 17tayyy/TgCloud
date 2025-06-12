@@ -1,11 +1,12 @@
 import os
 from telethon.tl.types import DocumentAttributeFilename
-from .files_db import SessionLocal, File, Folder
+from .files_db import SessionLocal, File, Folder, User
 from datetime import datetime
 import re
 from app.core.config import settings
 from sqlalchemy.orm import Session
 from telethon import TelegramClient
+from app.utils.encryption import encrypt_file, decrypt_file
 
 telegram_client = TelegramClient("tgcloud_session", settings.TG_API_ID, settings.TG_API_HASH)
 chat_id = settings.TG_CHAT_ID
@@ -13,13 +14,22 @@ chat_id = settings.TG_CHAT_ID
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DOWNLOADS_DIR = os.path.join(BASE_DIR, "downloaded_files")
 
-async def upload_file_to_tgcloud(file_path: str, folder: str ="default", db_session: Session = None):
+async def upload_file_to_tgcloud(file_path: str, folder: str = "default", db_session: Session = None, username: str = None):
     close_db = False
     if db_session is None:
         db_session = SessionLocal()
         close_db = True
 
+    user = db_session.query(User).filter_by(username=username).first()
+    encryption_enabled = user.encryption_enabled if user else False
+
     filename = os.path.basename(file_path)
+    encrypted = False
+    if encryption_enabled:
+        encrypted_file_path = encrypt_file(file_path)
+        file_path = encrypted_file_path
+        filename = os.path.basename(encrypted_file_path)
+        encrypted = True
 
     existing_files = db_session.query(File).filter_by(folder=folder).all()
     base_filename = filename
@@ -57,8 +67,8 @@ async def upload_file_to_tgcloud(file_path: str, folder: str ="default", db_sess
         filename=filename,
         message_id=message.id,
         size=str(os.path.getsize(file_path)),
-        encrypted=False,
-        original_name=os.path.basename(file_path),
+        encrypted=encrypted,
+        original_name=os.path.basename(file_path) if not encrypted else os.path.basename(file_path).replace("encrypted_", "", 1),
         uploaded_at=uploaded_at
     )
     db_session.add(db_file)
@@ -105,7 +115,6 @@ async def download_file_from_tgcloud(filename: str, folder: str ="default", db_s
     if not message or not message.document:
         if close_db:
             db_session.close()
-        print(f"ERROR: No se encontró el documento en Telegram para {filename}")
         return None, None
 
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
@@ -116,8 +125,10 @@ async def download_file_from_tgcloud(filename: str, folder: str ="default", db_s
         part_size_kb=1024*2
     )
 
+    if db_file.encrypted:
+        decrypt_file(download_path)
+
     if not os.path.exists(download_path):
-        print(f"ERROR: El archivo {download_path} no se descargó correctamente")
         return None, None
 
     if close_db:
