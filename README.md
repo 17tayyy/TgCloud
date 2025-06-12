@@ -239,4 +239,4 @@ MIT
 
 ---
 
-**Note:** This project is under active development and its structure and endpoints may change in the
+**Note:** This project is under active development and its structure and endpoints may change in the future.
