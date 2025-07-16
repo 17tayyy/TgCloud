@@ -1,242 +1,251 @@
-# TgCloudAPI
+# TgCloud
 
-TgCloudAPI is a FastAPI-based REST API that lets you use Telegram as a cloud storage backend. You can upload, download, share, and manage files and folders, with user authentication, optional encryption, and shareable expiring links.
+TgCloud is a modern full-stack web application that uses Telegram as a cloud storage backend. It features a React frontend with a FastAPI backend, allowing you to upload, download, share, and manage files and folders with user authentication, optional encryption, and shareable expiring links.
 
 ---
 
 ## Features
 
-- Upload/download files to/from Telegram via Telethon.
-- Organize files in virtual folders.
-- JWT-based user authentication.
-- Optional per-user file encryption.
-- Share files/folders with expirable tokens.
-- Audit logs and robust error handling.
-- Telegram session management via API.
-- SQLite database for metadata.
-- Ready for Docker and CI/CD.
+### 🚀 **Frontend (React + TypeScript)**
+- Modern, responsive UI with dark cyber theme
+- File/folder management with grid and list views
+- Drag & drop file uploads
+- Context menus (right-click) for quick actions
+- Real-time file preview
+- Download functionality with browser integration
+- Toast notifications with smart positioning
+- Telegram authentication flow
+- Mobile-friendly responsive design
+
+### ⚙️ **Backend (FastAPI)**
+- Upload/download files to/from Telegram via Telethon
+- Organize files in virtual folders
+- JWT-based user authentication
+- Optional per-user file encryption
+- Share files/folders with expirable tokens
+- Audit logs and robust error handling
+- Telegram session management via API
+- SQLite database for metadata
+- Ready for Docker and CI/CD
 
 ---
 
 ## Project Structure
 
 ```
-app/
-├── TgCloud/
-│   ├── client.py         # Telegram client logic (upload/download/delete)
-│   ├── files_db.py       # SQLAlchemy models and DB setup
-├── api/
-│   └── endpoints.py      # All API endpoints
-├── core/
-│   └── config.py         # Settings and environment variables
-├── services/
-│   └── file_service.py   # File/folder business logic
-├── schemas.py            # Pydantic schemas
-├── exceptions/           # Custom exceptions and handlers
-├── dependencies/         # FastAPI dependencies
-├── utils/                # Utilities (encryption, etc)
-main.py                   # FastAPI app entrypoint
-tests/
-│   └── tests.py          # Pytest-based API tests
+TgCloud/
+├── frontend/                 # React + TypeScript frontend
+│   ├── src/
+│   │   ├── components/      # UI components
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── FileItem.tsx
+│   │   │   ├── FilePreview.tsx
+│   │   │   ├── FloatingActionButton.tsx
+│   │   │   ├── Login.tsx
+│   │   │   ├── TelegramAuth.tsx
+│   │   │   └── ...
+│   │   ├── contexts/        # React contexts
+│   │   │   ├── AuthContext.tsx
+│   │   │   ├── FileContext.tsx
+│   │   │   └── TelegramContext.tsx
+│   │   ├── services/        # API services
+│   │   │   └── api.ts
+│   │   ├── types/           # TypeScript types
+│   │   └── pages/           # Page components
+│   ├── package.json
+│   └── vite.config.ts
+└── backend/                  # FastAPI backend
+    ├── app/
+    │   ├── TgCloud/
+    │   │   ├── client.py     # Telegram client logic
+    │   │   └── files_db.py   # SQLAlchemy models
+    │   ├── api/
+    │   │   └── endpoints.py  # API endpoints
+    │   ├── core/
+    │   │   └── config.py     # Settings
+    │   ├── services/
+    │   │   └── file_service.py
+    │   ├── schemas.py
+    │   ├── exceptions/
+    │   ├── dependencies/
+    │   └── utils/
+    ├── main.py               # FastAPI app entrypoint
+    ├── requirements.txt
+    └── tests/
 ```
 
 ---
 
 ## Quickstart
 
-1. **Clone and install dependencies**
-   ```bash
-   git clone https://github.com/17tayyy/TgCloudAPI.git
-   cd TgCloudAPI
-   pip install -r requirements.txt
-   ```
-
-2. **Configure environment variables**  
-   Create a `.env` file in the root:
-   ```
-   API_ID=your_telegram_api_id
-   API_HASH=your_telegram_api_hash
-   CHAT_ID=-100xxxxxxxxxx
-   SECRET_KEY=your_jwt_secret
-   PROJECT_NAME=TgCloudAPI
-   API_V1_STR=/api/v1
-   ```
-
-3. **Run the API**
-   ```bash
-   uvicorn main:app --reload
-   ```
-
-4. **Open the docs**  
-   Visit [http://localhost:8000/docs](http://localhost:8000/docs)
-
----
-
-## API Endpoints
-
-### User Authentication
-
-- `POST /api/v1/register`  
-  Register a new user.  
-  **Body:** `{ "username": "user", "password": "pass" }`
-
-- `POST /api/v1/token`  
-  Get JWT token.  
-  **Form:** `username`, `password`
-
----
-
-### Telegram Session Authentication
-
-- `POST /api/v1/tgcloud/auth/phone`  
-  Send Telegram code to phone.  
-  **Body:** `{ "phone": "+34XXXXXXXXX" }`
-
-- `POST /api/v1/tgcloud/auth/verify_code`  
-  Verify code sent to Telegram.  
-  **Body:** `{ "phone": "+34XXXXXXXXX", "code": "12345" }`  
-  Returns `"Password required"` if 2FA is enabled.
-
-- `POST /api/v1/tgcloud/auth/password`  
-  Complete login with 2FA password.  
-  **Body:** `{ "password": "your_telegram_password" }`
-
-- `GET /api/v1/tgcloud/auth/status`  
-  Check Telegram session status.
-
----
-
-### Folders
-
-- `POST /api/v1/folders/`  
-  Create a new folder.  
-  **Body:** `{ "folder": "myfolder" }`
-
-- `GET /api/v1/folders/`  
-  List all folders.
-
-- `PUT /api/v1/folders/{foldername}/rename`  
-  Rename a folder.  
-  **Body:** `{ "new_name": "newfolder" }`
-
-- `DELETE /api/v1/folders/{foldername}/`  
-  Delete a folder.
-
----
-
-### Files
-
-- `POST /api/v1/folders/{foldername}/files/`  
-  Upload a file to a folder.  
-  **Form:** `file` (UploadFile)
-
-- `GET /api/v1/folders/{foldername}/files/`  
-  List files in a folder.
-
-- `GET /api/v1/folders/{foldername}/files/{filename}`  
-  Get file info.
-
-- `GET /api/v1/folders/{foldername}/files/{filename}/download`  
-  Download a file.
-
-- `PUT /api/v1/folders/{foldername}/files/{filename}/rename`  
-  Rename a file.  
-  **Body:** `{ "new_name": "newfile.txt" }`
-
-- `POST /api/v1/folders/{foldername}/files/{filename}/move`  
-  Move a file to another folder.  
-  **Body:** `{ "dest_folder": "otherfolder" }`
-
-- `DELETE /api/v1/folders/{foldername}/files/{filename}`  
-  Delete a file.
-
----
-
-### Encryption
-
-- `POST /api/v1/encryption/on`  
-  Enable encryption for current user.
-
-- `POST /api/v1/encryption/off`  
-  Disable encryption for current user.
-
----
-
-### Sharing
-
-- `POST /api/v1/folders/{foldername}/files/{filename}/share`  
-  Generate a share token for a file.
-
-- `POST /api/v1/folders/{foldername}/share`  
-  Generate a share token for a folder.
-
-- `POST /api/v1/access/revoke/{token}`  
-  Revoke a share token.
-
-- `GET /api/v1/access/file/{token}`  
-  Get shared file info.
-
-- `GET /api/v1/access/file/{token}/download`  
-  Download shared file.
-
-- `GET /api/v1/access/folder/{token}`  
-  Get shared folder info.
-
-- `GET /api/v1/access/folder/{token}/{filename}/download`  
-  Download file from shared folder.
-
----
-
-### Stats
-
-- `GET /api/v1/stats/`  
-  Get usage statistics for the current user.
-
----
-
-## Example Usage (curl)
-
-```bash
-# Register a user
-curl -X POST http://localhost:8000/api/v1/register -H "Content-Type: application/json" -d '{"username":"user","password":"pass"}'
-
-# Login and get token
-curl -X POST http://localhost:8000/api/v1/token -F "username=user" -F "password=pass"
-
-# Authenticate Telegram session
-curl -X POST http://localhost:8000/api/v1/tgcloud/auth/phone -H "Content-Type: application/json" -d '{"phone":"+34XXXXXXXXX"}'
-curl -X POST http://localhost:8000/api/v1/tgcloud/auth/verify_code -H "Content-Type: application/json" -d '{"phone":"+34XXXXXXXXX","code":"12345"}'
-curl -X POST http://localhost:8000/api/v1/tgcloud/auth/password -H "Content-Type: application/json" -d '{"password":"your_telegram_password"}'
-
-# Upload a file
-curl -X POST http://localhost:8000/api/v1/folders/myfolder/files/ -H "Authorization: Bearer <token>" -F "file=@/path/to/file.txt"
-```
-
----
-
-## Running Tests
-
-You can test the API endpoints using pytest:
-
-```bash
-pytest tests/tests.py
-```
-
----
-
-## Requirements
-
+### Prerequisites
+- Node.js 18+ and npm
 - Python 3.8+
 - Telegram account and channel/chat to use as storage
-- Telegram API ID and Hash (https://my.telegram.org)
-- SQLite (default) or adapt for another DB
+- Telegram API ID and Hash from [my.telegram.org](https://my.telegram.org)
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/17tayyy/TgCloud.git
+cd TgCloud
+```
+
+### 2. Setup Backend
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+Create a `.env` file in the `backend/` directory:
+```env
+API_ID=your_telegram_api_id
+API_HASH=your_telegram_api_hash
+CHAT_ID=-100xxxxxxxxxx
+SECRET_KEY=your_jwt_secret
+PROJECT_NAME=TgCloud
+API_V1_STR=/api/v1
+```
+
+Run the backend:
+```bash
+uvicorn main:app --reload
+```
+
+### 3. Setup Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 4. Access the application
+- **Frontend:** [http://localhost:8080](http://localhost:8080)
+- **Backend API docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
+## Usage
+
+### 🌐 **Web Interface**
+1. **Register/Login:** Create an account or login with existing credentials
+2. **Telegram Auth:** Connect your Telegram account (phone verification + optional 2FA)
+3. **File Management:** 
+   - Create folders
+   - Upload files (drag & drop or right-click menu)
+   - Download files
+   - View file previews
+   - Share files with expirable links
+4. **Settings:** Toggle encryption on/off
+
+### 📱 **Mobile Support**
+- Responsive design works on mobile devices
+- Touch-friendly interface
+- Context menus work with touch & hold
+
+---
+
+## Development
+
+### Frontend Development
+```bash
+cd frontend
+npm run dev     # Development server
+npm run build   # Production build
+npm run preview # Preview production build
+```
+
+### Backend Development
+```bash
+cd backend
+uvicorn main:app --reload  # Development server with hot reload
+pytest tests/tests.py      # Run tests
+```
+
+### Tech Stack
+
+**Frontend:**
+- React 18 + TypeScript
+- Vite (build tool)
+- Tailwind CSS + shadcn/ui
+- React Router
+- React Query (TanStack Query)
+- Context API for state management
+
+**Backend:**
+- FastAPI
+- SQLAlchemy + SQLite
+- Telethon (Telegram client)
+- JWT authentication
+- Pydantic schemas
+- BCrypt password hashing
+
+---
+
+## API Reference
+
+The backend provides a comprehensive REST API. Here are the main endpoints:
+
+### Authentication
+- `POST /api/v1/register` - Register new user
+- `POST /api/v1/token` - Get JWT token
+
+### Telegram Session
+- `POST /api/v1/tgcloud/auth/phone` - Send verification code
+- `POST /api/v1/tgcloud/auth/verify_code` - Verify code
+- `POST /api/v1/tgcloud/auth/password` - 2FA password
+- `GET /api/v1/tgcloud/auth/status` - Session status
+
+### Files & Folders
+- `GET /api/v1/folders/` - List folders
+- `POST /api/v1/folders/` - Create folder
+- `DELETE /api/v1/folders/{name}` - Delete folder
+- `GET /api/v1/folders/{name}/files/` - List files in folder
+- `POST /api/v1/folders/{name}/files/` - Upload file
+- `GET /api/v1/folders/{name}/files/{filename}/download` - Download file
+- `DELETE /api/v1/folders/{name}/files/{filename}` - Delete file
+
+### Encryption & Sharing
+- `POST /api/v1/encryption/on` - Enable encryption
+- `POST /api/v1/encryption/off` - Disable encryption
+- `POST /api/v1/folders/{name}/files/{filename}/share` - Share file
+- `POST /api/v1/folders/{name}/share` - Share folder
+
+For complete API documentation, visit the [interactive docs](http://localhost:8000/docs) when running the backend.
+
+---
+
+## Screenshots
+
+### Login Page
+![Login](docs/login.png)
+*Beautifoul Login & register Page*
+
+### Main Dashboard
+![Dashboard](docs/dashboard.png)
+*Modern file management interface with list/grid views*
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-**Note:** This project is under active development and its structure and endpoints may change in the future.
+## Development Notes
+
+**Note:** This project is under active development. Features and structure may evolve as we continue improving the platform.
+
+**About the Development:** I'm a backend specialist with expertise in APIs, databases, and server-side architecture. The frontend React application was developed with significant assistance from AI tools to ensure modern UI/UX standards and best practices. While I focus on the robust FastAPI backend and Telegram integration, the frontend leverages AI-assisted development for optimal user experience.
+
+**Contributions Welcome:** Frontend developers are especially welcome to contribute improvements to the React codebase, UI/UX enhancements, and mobile optimization! 

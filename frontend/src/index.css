@@ -1,0 +1,86 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
+
+@layer base {
+  :root {
+    --background: 210 40% 2%;
+    --foreground: 210 40% 98%;
+
+    --card: 217 33% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 217 33% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 193 100% 50%;
+    --primary-foreground: 210 40% 2%;
+
+    --secondary: 217 33% 15%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 15%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 193 100% 50%;
+    --accent-foreground: 210 40% 2%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 15%;
+    --input: 217 33% 15%;
+    --ring: 193 100% 50%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 217 33% 8%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 193 100% 50%;
+    --sidebar-primary-foreground: 210 40% 2%;
+    --sidebar-accent: 217 33% 15%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 15%;
+    --sidebar-ring: 193 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-cyber-dark text-foreground;
+    background-image: 
+      radial-gradient(circle at 20% 80%, rgba(0, 217, 255, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(0, 153, 204, 0.1) 0%, transparent 50%);
+  }
+
+  .cyber-glow {
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+  }
+
+  .cyber-border {
+    border: 1px solid rgba(0, 217, 255, 0.3);
+  }
+}
+
+@layer components {
+  .cyber-card {
+    @apply bg-cyber-dark-card border border-cyber-blue/20 rounded-lg;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .cyber-button {
+    @apply bg-cyber-blue/10 border border-cyber-blue/30 text-cyber-blue hover:bg-cyber-blue/20 transition-all duration-300;
+  }
+
+  .cyber-input {
+    @apply bg-cyber-dark-light border border-cyber-blue/30 text-foreground placeholder:text-muted-foreground;
+  }
+}
