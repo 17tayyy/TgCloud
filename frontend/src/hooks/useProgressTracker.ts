@@ -39,7 +39,7 @@ export const useProgressTracker = () => {
     }
 
     try {
-      const wsUrl = `${import.meta.env.VITE_WS_BASE_URL}`;      
+      const wsUrl = `${import.meta.env.VITE_WS_BASE_URL}/ws/progress?token=${token}`;
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {

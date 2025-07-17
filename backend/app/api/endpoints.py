@@ -208,6 +208,10 @@ async def upload_file(
     operation_id = str(uuid.uuid4())
     
     try:
+
+        if not telegram_client.is_connected():
+            raise TelegramNotAuthorized()
+
         await ensure_telegram_ready()
         validate_names(foldername)
 
