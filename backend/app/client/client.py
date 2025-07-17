@@ -27,7 +27,7 @@ async def ensure_telegram_ready():
     if not await telegram_client.is_user_authorized():
         raise TelegramNotAuthorized()
     
-async def upload_file_to_tgcloud(file_path: str, folder: str = "default", db_session: Session = None, username: str = None):
+async def upload_file_to_tgcloud(file_path: str, folder: str = "default", db_session: Session = None, username: str = None, progress_callback=None):
     close_db = False
     if db_session is None:
         db_session = SessionLocal()
@@ -63,7 +63,8 @@ async def upload_file_to_tgcloud(file_path: str, folder: str = "default", db_ses
 
     uploaded_file = await telegram_client.upload_file(
         file_path,
-        part_size_kb=512
+        part_size_kb=512,
+        progress_callback=progress_callback
     )
 
     message = await telegram_client.send_file(
@@ -112,7 +113,7 @@ async def upload_file_to_tgcloud(file_path: str, folder: str = "default", db_ses
 
     return db_file
 
-async def download_file_from_tgcloud(filename: str, folder: str ="default", db_session: Session = None):
+async def download_file_from_tgcloud(filename: str, folder: str ="default", db_session: Session = None, progress_callback=None):
     close_db = False
 
     if db_session is None:
@@ -133,10 +134,12 @@ async def download_file_from_tgcloud(filename: str, folder: str ="default", db_s
 
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
     download_path = os.path.join(DOWNLOADS_DIR, db_file.filename)
+    
     await telegram_client.download_file(
         message.document,
         file=download_path,
-        part_size_kb=1024*2
+        part_size_kb=1024*2,
+        progress_callback=progress_callback
     )
 
     if db_file.encrypted:

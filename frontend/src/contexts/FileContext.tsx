@@ -1,8 +1,8 @@
-
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { foldersAPI, filesAPI } from '@/services/api';
 import { APIFolder, APIFile } from '@/types/api';
 import { toast } from '@/hooks/use-toast';
+import { useProgressTracker } from '@/hooks/useProgressTracker';
 
 export interface FileItem {
   id: string;
@@ -13,6 +13,15 @@ export interface FileItem {
   path: string;
   mimeType?: string;
   encrypted?: boolean;
+  isTemporary?: boolean; // Para carpetas temporales en edición
+  isEditing?: boolean;   // Para indicar si está en modo edición
+}
+
+export interface FileTypeInfo {
+  category: 'image' | 'video' | 'audio' | 'document' | 'archive' | 'code' | 'text' | 'unknown';
+  icon: string;
+  color: string;
+  description: string;
 }
 
 interface FileContextType {
@@ -26,16 +35,64 @@ interface FileContextType {
   setCurrentPath: (path: string) => void;
   setViewMode: (mode: 'grid' | 'list') => void;
   toggleFileSelection: (fileId: string) => void;
+  selectAllFiles: (fileIds: string[]) => void;
   clearSelection: () => void;
   setPreviewFile: (file: FileItem | null) => void;
   uploadFiles: (files: File[]) => Promise<void>;
   deleteFiles: (fileIds: string[]) => Promise<void>;
   createFolder: (name: string) => Promise<void>;
+  createTemporaryFolder: () => void;
+  renameFolder: (fileId: string, newName: string) => Promise<void>;
+  cancelFolderCreation: (fileId: string) => void;
   moveFile: (fileId: string, targetPath: string) => void;
   loadData: () => Promise<void>;
   shareFile: (fileId: string) => Promise<string>;
   downloadFile: (fileId: string) => Promise<void>;
+  downloadMultipleFiles: (fileIds: string[]) => Promise<void>;
 }
+
+// Export utility function for file type detection
+export const getFileTypeInfo = (filename: string): FileTypeInfo => {
+  const extension = filename.split('.').pop()?.toLowerCase() || '';
+  
+  // Image files
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tiff', 'tif'].includes(extension)) {
+    return { category: 'image', icon: 'ImageIcon', color: '#10b981', description: 'Image' };
+  }
+  
+  // Video files
+  if (['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v', '3gp', 'ogv'].includes(extension)) {
+    return { category: 'video', icon: 'VideoIcon', color: '#f59e0b', description: 'Video' };
+  }
+  
+  // Audio files
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma', 'opus', 'aiff'].includes(extension)) {
+    return { category: 'audio', icon: 'MusicIcon', color: '#8b5cf6', description: 'Audio' };
+  }
+  
+  // Document files
+  if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp'].includes(extension)) {
+    return { category: 'document', icon: 'FileTextIcon', color: '#3b82f6', description: 'Document' };
+  }
+  
+  // Archive files
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'z', 'lz', 'lzma'].includes(extension)) {
+    return { category: 'archive', icon: 'ArchiveIcon', color: '#6b7280', description: 'Archive' };
+  }
+  
+  // Code files
+  if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'css', 'html', 'php', 'rb', 'go', 'rs', 'swift'].includes(extension)) {
+    return { category: 'code', icon: 'CodeIcon', color: '#ef4444', description: 'Code' };
+  }
+  
+  // Text files
+  if (['txt', 'md', 'json', 'xml', 'yaml', 'yml', 'ini', 'cfg', 'conf', 'log'].includes(extension)) {
+    return { category: 'text', icon: 'ScrollTextIcon', color: '#14b8a6', description: 'Text' };
+  }
+  
+  // Unknown/other files
+  return { category: 'unknown', icon: 'FileIcon', color: '#6b7280', description: 'File' };
+};
 
 const FileContext = createContext<FileContextType | undefined>(undefined);
 
@@ -74,8 +131,17 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Hook de progreso
+  const { connect, disconnect, isConnected } = useProgressTracker();
 
   const toggleFileSelection = (fileId: string) => {
+    // No permitir selección de archivos temporales
+    const file = files.find(f => f.id === fileId);
+    if (file?.isTemporary) {
+      return;
+    }
+    
     setSelectedFiles(prev =>
       prev.includes(fileId)
         ? prev.filter(id => id !== fileId)
@@ -85,6 +151,10 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearSelection = () => {
     setSelectedFiles([]);
+  };
+
+  const selectAllFiles = (fileIds: string[]) => {
+    setSelectedFiles(fileIds);
   };
 
   const loadData = async () => {
@@ -102,11 +172,16 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const fileItems = filesData.map((file: APIFile) => convertAPIFileToFileItem(file, currentPath));
         setFiles(fileItems);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading data:', error);
+      let description = "Failed to load files";
+      if (typeof error === "object" && error !== null && "response" in error) {
+        const errObj = error as { response?: { data?: { detail?: string } } };
+        description = errObj.response?.data?.detail || description;
+      }
       toast({
         title: "Error loading files",
-        description: error.response?.data?.detail || "Failed to load files",
+        description,
         variant: "destructive"
       });
     } finally {
@@ -118,6 +193,35 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     loadData();
   }, [currentPath]);
+
+  // Connect to progress WebSocket
+  useEffect(() => {
+    const token = localStorage.getItem('tgcloud_token');
+    if (token) {
+      connect();
+    }
+    
+    return () => {
+      disconnect();
+    };
+  }, [connect, disconnect]);
+
+  // Also try to connect when component updates and token becomes available
+  useEffect(() => {
+    const checkTokenAndConnect = () => {
+      const token = localStorage.getItem('tgcloud_token');
+      if (token && !isConnected) {
+        connect();
+      }
+    };
+
+    checkTokenAndConnect();
+    window.addEventListener('storage', checkTokenAndConnect);
+    
+    return () => {
+      window.removeEventListener('storage', checkTokenAndConnect);
+    };
+  }, [connect, isConnected]);
 
   const uploadFiles = async (newFiles: File[]) => {
     if (currentPath === '/') {
@@ -139,21 +243,12 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     for (const file of newFiles) {
       try {
-        await filesAPI.upload(folderName, file, (progress) => {
-          console.log(`Upload progress for ${file.name}: ${progress}%`);
-        });
+        const result = await filesAPI.upload(folderName, file);
         successCount++;
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Upload error:', error);
         errorCount++;
       }
-    }
-    
-    if (successCount > 0) {
-      toast({
-        title: "Upload completed",
-        description: `${successCount} of ${totalFiles} files uploaded successfully`,
-      });
     }
     
     if (errorCount > 0) {
@@ -186,7 +281,7 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
           title: "Deleted successfully",
           description: `${file.name} has been deleted`,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Delete error:', error);
         toast({
           title: "Delete failed",
@@ -205,14 +300,63 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await foldersAPI.create(name);
       console.log(`Folder "${name}" created successfully`);
       await loadData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Create folder error:', error);
+      let description = "Failed to create folder";
+      if (typeof error === "object" && error !== null && "response" in error) {
+        const errObj = error as { response?: { data?: { detail?: string } } };
+        description = errObj.response?.data?.detail || description;
+      }
       toast({
         title: "Create folder failed",
-        description: error.response?.data?.detail || "Failed to create folder",
+        description,
         variant: "destructive"
       });
     }
+  };
+
+  const createTemporaryFolder = () => {
+    const tempId = `temp-${Date.now()}`;
+    const tempFolder: FileItem = {
+      id: tempId,
+      name: 'Nueva carpeta',
+      type: 'folder',
+      modified: new Date(),
+      path: currentPath === '/' ? '/Nueva carpeta' : `${currentPath}/Nueva carpeta`,
+      isTemporary: true,
+      isEditing: true
+    };
+    
+    setFiles(prev => [...prev, tempFolder]);
+  };
+
+  const renameFolder = async (fileId: string, newName: string) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file || !file.isTemporary) return;
+    
+    try {
+      await foldersAPI.create(newName);
+      console.log(`Folder "${newName}" created successfully`);
+      await loadData();
+    } catch (error: unknown) {
+      console.error('Create folder error:', error);
+      let description = "Failed to create folder";
+      if (typeof error === "object" && error !== null && "response" in error) {
+        const errObj = error as { response?: { data?: { detail?: string } } };
+        description = errObj.response?.data?.detail || description;
+      }
+      toast({
+        title: "Create folder failed",
+        description,
+        variant: "destructive"
+      });
+      // Remove temporary folder on error
+      setFiles(prev => prev.filter(f => f.id !== fileId));
+    }
+  };
+
+  const cancelFolderCreation = (fileId: string) => {
+    setFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
   const shareFile = async (fileId: string): Promise<string> => {
@@ -229,9 +373,14 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       return response.message;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Share error:', error);
-      throw new Error(error.response?.data?.detail || 'Failed to share file');
+      let errorMessage = 'Failed to share file';
+      if (typeof error === 'object' && error !== null && 'response' in error) {
+        const errObj = error as { response?: { data?: { detail?: string } } };
+        errorMessage = errObj.response?.data?.detail || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
   };
 
@@ -277,8 +426,24 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Downloading:', { folderName, fileName, filePath: file.path });
 
-      // Call the API
-      const blob = await filesAPI.download(folderName, fileName);
+      // Usar fetch con headers personalizados en lugar de axios
+      const token = localStorage.getItem('tgcloud_token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`http://localhost:8000/api/v1/folders/${encodeURIComponent(folderName)}/files/${encodeURIComponent(fileName)}/download`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const blob = await response.blob();
       
       // Create download link
       const url = window.URL.createObjectURL(blob);
@@ -292,16 +457,45 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.URL.revokeObjectURL(url);
       document.body.removeChild(link);
       
-      toast({
-        title: "Download started",
-        description: `${fileName} is being downloaded`,
-      });
-      
     } catch (error: unknown) {
       console.error('Download error:', error);
       toast({
         title: "Download failed",
         description: "Failed to download file",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const downloadMultipleFiles = async (fileIds: string[]) => {
+    try {
+      const filesToDownload = files.filter(f => fileIds.includes(f.id) && f.type === 'file');
+      
+      if (filesToDownload.length === 0) {
+        toast({
+          title: "No files to download",
+          description: "Selected items contain no downloadable files",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Download each file with a small delay to avoid overwhelming the server
+      for (let i = 0; i < filesToDownload.length; i++) {
+        const file = filesToDownload[i];
+        await downloadFile(file.id);
+        
+        // Add small delay between downloads
+        if (i < filesToDownload.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+    } catch (error: unknown) {
+      console.error('Bulk download error:', error);
+      toast({
+        title: "Bulk download failed",
+        description: "Failed to download multiple files",
         variant: "destructive"
       });
     }
@@ -319,15 +513,20 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentPath,
       setViewMode,
       toggleFileSelection,
+      selectAllFiles,
       clearSelection,
       setPreviewFile,
       uploadFiles,
       deleteFiles,
       createFolder,
+      createTemporaryFolder,
+      renameFolder,
+      cancelFolderCreation,
       moveFile,
       downloadFile,
       loadData,
-      shareFile
+      shareFile,
+      downloadMultipleFiles
     }}>
       {children}
     </FileContext.Provider>

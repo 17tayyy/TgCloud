@@ -1,21 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFiles } from '@/contexts/FileContext';
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { Button } from '@/components/ui/button';
-import { Upload, FolderPlus } from 'lucide-react';
+import { Upload, FolderPlus, Download, Trash, X, CheckSquare, Square } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import Header from './Header';
 import Breadcrumbs from './Breadcrumbs';
 import FileItem from './FileItem';
 import FilePreview from './FilePreview';
 import FloatingActionButton from './FloatingActionButton';
+import StatisticsPage from './StatisticsPage';
+import { ConfirmDialog } from './ConfirmDialog';
+import { ProgressManager } from './ProgressManager';
 
 const Dashboard = () => {
-  const { files, currentPath, viewMode, selectedFiles, previewFile, uploadFiles, createFolder } = useFiles();
-  const [showCreateFolder, setShowCreateFolder] = useState(false);
-  const [folderName, setFolderName] = useState('');
+  const { 
+    files, 
+    currentPath, 
+    viewMode, 
+    selectedFiles, 
+    previewFile, 
+    uploadFiles, 
+    createFolder, 
+    createTemporaryFolder,
+    clearSelection, 
+    selectAllFiles,
+    deleteFiles, 
+    downloadMultipleFiles 
+  } = useFiles();
+  const [showStatsPage, setShowStatsPage] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const getCurrentFiles = () => {
     return files.filter(file => {
@@ -61,16 +75,124 @@ const Dashboard = () => {
   };
 
   const handleCreateFolder = () => {
-    if (folderName.trim()) {
-      createFolder(folderName.trim());
-      setFolderName('');
-      setShowCreateFolder(false);
+    if (currentPath === '/') {
+      createTemporaryFolder();
+    } else {
+      toast({
+        title: "Cannot create folder here",
+        description: "Folders can only be created in the root directory. Navigate back to create a new folder.",
+        variant: "destructive"
+      });
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedFiles.length === 0) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    await deleteFiles(selectedFiles);
+    clearSelection();
+  };
+
+  const handleBulkDownload = async () => {
+    if (selectedFiles.length === 0) return;
+    
+    await downloadMultipleFiles(selectedFiles);
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case 'a':
+            event.preventDefault();
+            if (currentFiles.length > 0) {
+              const allFileIds = currentFiles.map(file => file.id);
+              selectAllFiles(allFileIds);
+            }
+            break;
+          case 'Escape':
+            event.preventDefault();
+            clearSelection();
+            break;
+        }
+      }
+      if (event.key === 'Escape') {
+        clearSelection();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [currentFiles, clearSelection, selectAllFiles]);
+
+  const handleSelectAll = () => {
+    const allFileIds = currentFiles.map(file => file.id);
+    selectAllFiles(allFileIds);
+  };
+
+  // If showing stats page, render it instead of dashboard
+  if (showStatsPage) {
+    return <StatisticsPage onBack={() => setShowStatsPage(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-cyber-dark text-foreground">
-      <Header />
+      <Header onShowStatsPage={() => setShowStatsPage(true)} />
+      
+      {/* Selection Bar */}
+      {selectedFiles.length > 0 && (
+        <div className="bg-cyber-blue/10 border-b border-cyber-blue/30 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <CheckSquare className="w-4 h-4 text-cyber-blue" />
+                <span className="text-sm text-cyber-blue font-medium">
+                  {selectedFiles.length} of {currentFiles.length} item{selectedFiles.length > 1 ? 's' : ''} selected
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  onClick={handleBulkDownload}
+                  size="sm"
+                  variant="outline"
+                  className="border-cyber-blue/30 text-cyber-blue hover:bg-cyber-blue/10"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download {selectedFiles.length > 1 ? 'All' : ''}
+                </Button>
+                <Button
+                  onClick={handleBulkDelete}
+                  size="sm"
+                  variant="outline"
+                  className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                >
+                  <Trash className="w-4 h-4 mr-2" />
+                  Delete {selectedFiles.length > 1 ? 'All' : ''}
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-muted-foreground">
+                Press Ctrl+A to select all, Esc to clear
+              </span>
+              <Button
+                onClick={clearSelection}
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+                Clear
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="flex">
         <div className="flex-1">
           <Breadcrumbs />
@@ -111,16 +233,60 @@ const Dashboard = () => {
                 Upload Files
               </ContextMenuItem>
               <ContextMenuItem 
-                onClick={() => setShowCreateFolder(true)}
+                onClick={handleCreateFolder}
                 className="text-foreground hover:bg-cyber-blue/10"
               >
                 <FolderPlus className="w-4 h-4 mr-2" />
                 Create Folder
               </ContextMenuItem>
+              
+              {currentFiles.length > 0 && (
+                <>
+                  <ContextMenuSeparator className="bg-cyber-blue/20" />
+                  {selectedFiles.length === currentFiles.length ? (
+                    <ContextMenuItem 
+                      onClick={clearSelection}
+                      className="text-foreground hover:bg-cyber-blue/10"
+                    >
+                      <Square className="w-4 h-4 mr-2" />
+                      Deselect All
+                    </ContextMenuItem>
+                  ) : (
+                    <ContextMenuItem 
+                      onClick={handleSelectAll}
+                      className="text-foreground hover:bg-cyber-blue/10"
+                    >
+                      <CheckSquare className="w-4 h-4 mr-2" />
+                      Select All
+                    </ContextMenuItem>
+                  )}
+                </>
+              )}
+              
+              {selectedFiles.length > 0 && (
+                <>
+                  <ContextMenuSeparator className="bg-cyber-blue/20" />
+                  <ContextMenuItem 
+                    onClick={handleBulkDownload}
+                    className="text-foreground hover:bg-cyber-blue/10"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download {selectedFiles.length > 1 ? 'Files' : 'File'}
+                  </ContextMenuItem>
+                  <ContextMenuItem 
+                    onClick={handleBulkDelete}
+                    className="text-red-400 hover:bg-red-500/10"
+                  >
+                    <Trash className="w-4 h-4 mr-2" />
+                    Delete {selectedFiles.length > 1 ? 'Files' : 'File'}
+                  </ContextMenuItem>
+                </>
+              )}
             </ContextMenuContent>
           </ContextMenu>
         </div>
 
+        {/* Sidebar for preview */}
         {previewFile && (
           <div className="w-80 border-l border-cyber-blue/20">
             <FilePreview />
@@ -130,43 +296,17 @@ const Dashboard = () => {
 
       <FloatingActionButton />
 
-      {/* Create Folder Dialog */}
-      <Dialog open={showCreateFolder} onOpenChange={setShowCreateFolder}>
-        <DialogContent className="bg-cyber-dark-card border border-cyber-blue/30 text-foreground">
-          <DialogHeader>
-            <DialogTitle className="text-cyber-blue">Create New Folder</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              placeholder="Enter folder name"
-              value={folderName}
-              onChange={(e) => setFolderName(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleCreateFolder()}
-              className="bg-cyber-dark border-cyber-blue/30 text-foreground placeholder:text-muted-foreground"
-              autoFocus
-            />
-            <div className="flex justify-end space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowCreateFolder(false);
-                  setFolderName('');
-                }}
-                className="border-cyber-blue/30 text-cyber-blue hover:bg-cyber-blue/10"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateFolder}
-                disabled={!folderName.trim()}
-                className="bg-cyber-blue text-cyber-dark hover:bg-cyber-blue/90"
-              >
-                Create
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Selected Items"
+        description={`Are you sure you want to delete ${selectedFiles.length} selected item${selectedFiles.length > 1 ? 's' : ''}? This action cannot be undone.`}
+        onConfirm={confirmBulkDelete}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </div>
   );
 };

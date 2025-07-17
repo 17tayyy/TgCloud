@@ -64,3 +64,22 @@ def decode_access_token(token: str):
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+async def get_current_user_websocket(token: str):
+    if not token:
+        return None
+        
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+    except JWTError:
+        return None
+        
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        return user
+    finally:
+        db.close()

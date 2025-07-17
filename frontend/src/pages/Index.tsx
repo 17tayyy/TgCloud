@@ -6,6 +6,7 @@ import { FileProvider } from '@/contexts/FileContext';
 import { TelegramProvider } from '@/contexts/TelegramContext';
 import Login from '@/components/Login';
 import Dashboard from '@/components/Dashboard';
+import { ProgressManager } from '@/components/ProgressManager';
 
 const IndexContent = () => {
   const { isAuthenticated } = useAuth();
@@ -17,6 +18,7 @@ const IndexContent = () => {
   return (
     <TelegramProvider>
       <FileProvider>
+        <ProgressManager />
         <Dashboard />
       </FileProvider>
     </TelegramProvider>

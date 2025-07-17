@@ -99,18 +99,12 @@ export const filesAPI = {
     return response.data;
   },
 
-  upload: async (foldername: string, file: File, onProgress?: (progress: number) => void) => {
+  upload: async (foldername: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     
     const response = await api.post(`/folders/${foldername}/files/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      onUploadProgress: (progressEvent) => {
-        if (onProgress && progressEvent.total) {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          onProgress(progress);
-        }
-      }
+      headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data;
   },

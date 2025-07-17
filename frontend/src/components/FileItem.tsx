@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { FileItem as FileItemType, useFiles } from '@/contexts/FileContext';
+import { FileItem as FileItemType, useFiles, getFileTypeInfo } from '@/contexts/FileContext';
 import { Button } from '@/components/ui/button';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { Folder, File, Download, Trash, Share } from 'lucide-react';
 import { formatFileSize, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import FileTypeIcon from './FileTypeIcon';
+import { ConfirmDialog } from './ConfirmDialog';
+import { InlineEdit } from './InlineEdit';
 
 interface FileItemProps {
   file: FileItemType;
@@ -12,12 +15,18 @@ interface FileItemProps {
 }
 
 const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
-  const { selectedFiles, toggleFileSelection, setCurrentPath, deleteFiles, setPreviewFile, moveFile, currentPath, shareFile, files, downloadFile } = useFiles();
+  const { selectedFiles, toggleFileSelection, setCurrentPath, deleteFiles, setPreviewFile, moveFile, currentPath, shareFile, files, downloadFile, renameFolder, cancelFolderCreation } = useFiles();
   const isSelected = selectedFiles.includes(file.id);
   const [isDragging, setIsDragging] = useState(false);
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleClick = () => {
+    // No permitir navegación si está en modo edición
+    if (file.isEditing) {
+      return;
+    }
+    
     if (file.type === 'folder') {
       setCurrentPath(file.path);
     } else {
@@ -61,8 +70,22 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
   };
 
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete ${file.name}?`)) {
-      deleteFiles([file.id]);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    deleteFiles([file.id]);
+  };
+
+  const handleSaveName = (newName: string) => {
+    if (file.isTemporary) {
+      renameFolder(file.id, newName);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (file.isTemporary) {
+      cancelFolderCreation(file.id);
     }
   };
 
@@ -156,7 +179,18 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
     if (file.type === 'folder') {
       return <Folder className="w-6 h-6 text-cyber-blue" />;
     }
-    return <File className="w-6 h-6 text-cyber-blue/70" />;
+    
+    const fileTypeInfo = getFileTypeInfo(file.name);
+    return <FileTypeIcon iconName={fileTypeInfo.icon} color={fileTypeInfo.color} size={24} />;
+  };
+
+  const getFileIconLarge = () => {
+    if (file.type === 'folder') {
+      return <Folder className="w-8 h-8 text-cyber-blue" />;
+    }
+    
+    const fileTypeInfo = getFileTypeInfo(file.name);
+    return <FileTypeIcon iconName={fileTypeInfo.icon} color={fileTypeInfo.color} size={32} />;
   };
 
   if (viewMode === 'grid') {
@@ -182,17 +216,37 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
           >
             <div className="flex flex-col items-center space-y-3">
               <div className="w-16 h-16 bg-cyber-blue/10 rounded-lg flex items-center justify-center">
-                {file.type === 'folder' ? (
-                  <Folder className="w-8 h-8 text-cyber-blue" />
-                ) : (
-                  <File className="w-8 h-8 text-cyber-blue/70" />
-                )}
+                {getFileIconLarge()}
               </div>
               <div className="text-center w-full">
-                <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {file.type === 'file' && file.size ? formatFileSize(file.size) : formatDate(file.modified)}
-                </p>
+                {file.isEditing ? (
+                  <InlineEdit
+                    initialValue={file.name}
+                    onSave={handleSaveName}
+                    onCancel={handleCancelEdit}
+                  />
+                ) : (
+                  <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+                )}
+                <div className="flex flex-col items-center space-y-1">
+                  {file.type === 'file' && (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        {getFileTypeInfo(file.name).description}
+                      </p>
+                      {file.size && (
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.size)}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {file.type === 'folder' && (
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(file.modified)}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -203,7 +257,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
           </ContextMenuItem>
           <ContextMenuItem onClick={handleShare} className="text-foreground hover:bg-cyber-blue/10">
             <Share className="w-4 h-4 mr-2" />
-            Share file
+            Share {file.type === 'folder' ? 'folder' : 'file'}
           </ContextMenuItem>
           {file.type === 'file' && (
             <ContextMenuItem onClick={handleDownload} className="text-foreground hover:bg-cyber-blue/10">
@@ -222,6 +276,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
   }
 
   return (
+    <>
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
@@ -245,10 +300,23 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
             {getFileIcon()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {formatDate(file.modified)}
-            </p>
+            {file.isEditing ? (
+              <InlineEdit
+                initialValue={file.name}
+                onSave={handleSaveName}
+                onCancel={handleCancelEdit}
+              />
+            ) : (
+              <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+            )}
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              {file.type === 'file' && (
+                <span style={{ color: getFileTypeInfo(file.name).color }}>
+                  {getFileTypeInfo(file.name).description}
+                </span>
+              )}
+              <span>{formatDate(file.modified)}</span>
+            </div>
           </div>
           <div className="flex-shrink-0 text-xs text-muted-foreground">
             {file.type === 'file' && file.size ? formatFileSize(file.size) : 'Folder'}
@@ -261,7 +329,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
         </ContextMenuItem>
         <ContextMenuItem onClick={handleShare} className="text-foreground hover:bg-cyber-blue/10">
           <Share className="w-4 h-4 mr-2" />
-          Share file
+          Share {file.type === 'folder' ? 'folder' : 'file'}
         </ContextMenuItem>
         {file.type === 'file' && (
           <ContextMenuItem onClick={handleDownload} className="text-foreground hover:bg-cyber-blue/10">
@@ -276,6 +344,18 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
+
+    <ConfirmDialog
+      open={showDeleteConfirm}
+      onOpenChange={setShowDeleteConfirm}
+      title="Delete File"
+      description={`Are you sure you want to delete "${file.name}"? This action cannot be undone.`}
+      onConfirm={confirmDelete}
+      confirmText="Delete"
+      cancelText="Cancel"
+      variant="destructive"
+    />
+    </>
   );
 };
 

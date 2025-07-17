@@ -5,11 +5,16 @@ import { useFiles } from '@/contexts/FileContext';
 import { useTelegram } from '@/contexts/TelegramContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Grid, List, MessageCircle, CheckCircle, AlertCircle } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Grid, List, MessageCircle, CheckCircle, AlertCircle, BarChart3 } from 'lucide-react';
 import TelegramAuth from './TelegramAuth';
 
-const Header = () => {
+interface HeaderProps {
+  onShowStats?: () => void;
+  onShowStatsPage?: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onShowStats, onShowStatsPage }) => {
   const { user, logout } = useAuth();
   const { viewMode, setViewMode } = useFiles();
   const { isConnected, isConnecting, error, isAuthModalOpen, setAuthModalOpen, startAuth } = useTelegram();
@@ -126,6 +131,16 @@ const Header = () => {
                     </div>
                   </div>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-cyber-blue/20" />
+                {onShowStatsPage && (
+                  <DropdownMenuItem 
+                    onClick={onShowStatsPage}
+                    className="text-foreground hover:bg-cyber-blue/10 cursor-pointer"
+                  >
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Statistics
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem 
                   onClick={logout}
                   className="text-red-400 hover:bg-red-500/10 cursor-pointer"
