@@ -1,0 +1,54 @@
+# Dependencias
+__pycache__/
+*.py[cod]
+*.so
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+.env/
+
+# Archivos de entorno
+.env
+.env.*.local
+
+# Archivos de logs y salida
+*.log
+*.out
+*.pid
+
+# Editor y herramientas
+.vscode/
+.idea/
+*.swp
+*~
+
+# Git y CI/CD
+.git
+.gitignore
+.github/
+
+# Datos y cachés
+*.sqlite3
+*.db
+*.bak
+*.tmp
+*.tsbuildinfo
+.cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage/
+dist/
+build/
+
+# Documentación generada
+*.pdf
+*.docx
+*.md~
+
+# Otros
+Dockerfile
+docker-compose.yml
+*.session

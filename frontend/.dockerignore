@@ -1,0 +1,39 @@
+# Evitar que entren dependencias del host
+node_modules
+dist
+
+# Configs del editor
+.vscode
+.idea
+
+# Git y CI/CD
+.git
+.gitignore
+.github
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de entorno
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Tests y coverage
+coverage
+*.test.js
+*.spec.js
+*.test.ts
+*.spec.ts
+
+# Archivos de salida de build
+*.log
+*.out
+*.tsbuildinfo

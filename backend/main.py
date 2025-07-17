@@ -20,7 +20,16 @@ async def lifespan(app: FastAPI):
     init_tg_db()
     yield
 
-app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+if settings.DEV:
+    app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+else:
+    app = FastAPI(
+        title=settings.PROJECT_NAME,
+        lifespan=lifespan,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
 
 # Middleware para agregar CORS headers a todas las respuestas (incluyendo errores)
 @app.middleware("http")

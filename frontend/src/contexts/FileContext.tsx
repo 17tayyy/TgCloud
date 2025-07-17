@@ -432,7 +432,8 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://localhost:8000/api/v1/folders/${encodeURIComponent(folderName)}/files/${encodeURIComponent(fileName)}/download`, {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+      const response = await fetch(`${apiBaseUrl}/folders/${encodeURIComponent(folderName)}/files/${encodeURIComponent(fileName)}/download`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
