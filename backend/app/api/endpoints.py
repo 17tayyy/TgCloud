@@ -703,7 +703,7 @@ async def share_file(
     db.add(db_token)
     db.commit()
 
-    url = f"{settings.API_V1_STR}/access/file/{token}"
+    url = f"{settings.FRONTEND_URL}/shared/file/{token}"
     return {"message": url}
 
 @router.post("/folders/{foldername}/share", response_model=MessageResponse)
@@ -742,7 +742,7 @@ async def share_folder(
     db.add(db_token)
     db.commit()
 
-    url = f"{settings.API_V1_STR}/access/folder/{token}"
+    url = f"{settings.FRONTEND_URL}/shared/folder/{token}"
     return {"message": url}
 
 @router.get("/access/file/{token}", response_model=FileResponse)
