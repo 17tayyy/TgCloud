@@ -381,14 +381,35 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
         response = await filesAPI.share(folderName, file.name);
       }
       
-      return response.message;
+      // Handle different response formats
+      if (response && typeof response === 'object') {
+        if ('message' in response && response.message) {
+          return response.message;
+        }
+        if ('url' in response && response.url) {
+          return response.url;
+        }
+        if ('data' in response && response.data && response.data.message) {
+          return response.data.message;
+        }
+      }
+      
+      // Fallback if response format is unexpected
+      throw new Error('Invalid response format from server');
     } catch (error: unknown) {
       console.error('Share error:', error);
       let errorMessage = 'Failed to share file';
-      if (typeof error === 'object' && error !== null && 'response' in error) {
-        const errObj = error as { response?: { data?: { detail?: string } } };
-        errorMessage = errObj.response?.data?.detail || errorMessage;
+      
+      if (typeof error === 'object' && error !== null) {
+        if ('response' in error) {
+          const errObj = error as { response?: { data?: { detail?: string } } };
+          errorMessage = errObj.response?.data?.detail || errorMessage;
+        } else if ('message' in error) {
+          const msgError = error as { message: string };
+          errorMessage = msgError.message;
+        }
       }
+      
       throw new Error(errorMessage);
     }
   };

@@ -204,6 +204,11 @@ FakesAssemblies/
 # Visual Studio 6 workspace options file
 *.opt
 
+# Auto-generated files
+docker-compose.yml
+docker-compose.override.yml
+
 # Changes
 changes.sh
 changes_*.txt
+app.env

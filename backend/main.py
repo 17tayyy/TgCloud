@@ -63,5 +63,15 @@ app.add_middleware(
 for exc, handler in exception_handlers:
     app.add_exception_handler(exc, handler)
 
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker and monitoring"""
+    return {
+        "status": "healthy",
+        "service": "TgCloud Backend",
+        "version": "1.0.0"
+    }
+
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(websocket_router)
