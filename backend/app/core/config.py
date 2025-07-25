@@ -11,6 +11,7 @@ class Settings:
     TG_API_HASH = os.getenv("API_HASH")
     TG_CHAT_ID = int(os.getenv("CHAT_ID")) if os.getenv("CHAT_ID") else None
     SECRET_KEY = os.getenv("SECRET_KEY")
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8080")
     
     ALLOWED_ORIGINS = [
         "http://localhost:3000",

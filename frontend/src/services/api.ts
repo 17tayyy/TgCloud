@@ -164,3 +164,30 @@ export const encryptionAPI = {
     return response.data;
   }
 };
+
+// Shared content endpoints (no auth required)
+export const sharedAPI = {
+  getFileInfo: async (token: string) => {
+    const response = await api.get(`/access/file/${token}`);
+    return response.data;
+  },
+
+  getFolderInfo: async (token: string) => {
+    const response = await api.get(`/access/folder/${token}`);
+    return response.data;
+  },
+
+  downloadFile: async (token: string) => {
+    const response = await api.get(`/access/file/${token}/download`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  downloadFromFolder: async (token: string, filename: string) => {
+    const response = await api.get(`/access/folder/${token}/${filename}/download`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+};

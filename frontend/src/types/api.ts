@@ -30,3 +30,21 @@ export interface AuthResponse {
 export interface ShareResponse {
   message: string;
 }
+
+export interface SharedFileInfo {
+  filename: string;
+  size: string;
+  uploaded_at: string;
+  encrypted: boolean;
+}
+
+export interface SharedFolderInfo {
+  foldername: string;
+  files: Array<{
+    filename: string;
+    size: string;
+    encrypted: boolean;
+    uploaded_at: string;
+  }>;
+  created_at: string;
+}

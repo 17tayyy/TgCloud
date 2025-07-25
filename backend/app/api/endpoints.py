@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File as FastAPIFile, Form, Depends, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from fastapi.responses import FileResponse as FastAPIFileResponse, JSONResponse
-from app.schemas import FileResponse, FolderCreate, FolderResponse, FileRename, FolderRename, MoveFile, UserCreate, MessageResponse, TokenResponse, StatsResponse, PasswordRequest, CodeRequest, PhoneRequest
+from app.schemas import FileResponse, FolderCreate, FolderResponse, FileRename, FolderRename, MoveFile, UserCreate, MessageResponse, TokenResponse, StatsResponse, PasswordRequest, CodeRequest, PhoneRequest, SharedFolderResponse
 from app.client.client import upload_file_to_tgcloud, download_file_from_tgcloud, delete_file_from_tgcloud, delete_folder_from_tgcloud
 from app.client.files_db import SessionLocal, File, Folder, User, ShareToken
 from app.core.config import settings
@@ -798,16 +798,28 @@ async def download_shared_file(
     
     return response
 
-@router.get("/access/folder/{token}", response_model=List[FileResponse])
+@router.get("/access/folder/{token}", response_model=SharedFolderResponse)
 async def access_shared_folder_info(
     token: str,
     db: Session = Depends(get_db)
 ):
     """Access shared folder information using a share token."""
     payload, db_token = validate_share_token(db, token, "folder")
-    folder = payload["folder"]
-    files = get_files_in_folder(db, folder)
-    return files
+    folder_name = payload["folder"]
+    
+    # Get folder info
+    folder = get_folder_by_name(db, folder_name)
+    if not folder:
+        raise FolderNotFoundException(folder_name)
+    
+    # Get files in folder
+    files = get_files_in_folder(db, folder_name)
+    
+    return SharedFolderResponse(
+        foldername=folder_name,
+        files=files,
+        created_at=folder.created_at
+    )
 
 @router.get("/access/folder/{token}/{filename}/download")
 async def download_file_from_shared_folder(

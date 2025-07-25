@@ -69,3 +69,8 @@ class CodeRequest(BaseModel):
 
 class PasswordRequest(BaseModel):
     password: str
+
+class SharedFolderResponse(BaseModel):
+    foldername: str
+    files: list[FileResponse]
+    created_at: datetime

@@ -206,4 +206,4 @@ FakesAssemblies/
 
 # Changes
 changes.sh
-reporte_cambios.txt
+changes_*.txt
