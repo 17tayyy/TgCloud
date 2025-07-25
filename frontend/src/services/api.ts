@@ -134,6 +134,13 @@ export const filesAPI = {
   share: async (foldername: string, filename: string) => {
     const response = await api.post(`/folders/${foldername}/files/${filename}/share`);
     return response.data;
+  },
+
+  preview: async (foldername: string, filename: string) => {
+    const response = await api.get(`/folders/${foldername}/files/${filename}/preview`, {
+      responseType: 'blob'
+    });
+    return URL.createObjectURL(response.data);
   }
 };
 

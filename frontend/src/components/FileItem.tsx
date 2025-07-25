@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileItem as FileItemType, useFiles, getFileTypeInfo } from '@/contexts/FileContext';
 import { Button } from '@/components/ui/button';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu';
-import { Folder, File, Download, Trash, Share } from 'lucide-react';
+import { Folder, File, Download, Trash, Share, Eye } from 'lucide-react';
 import { formatFileSize, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import FileTypeIcon from './FileTypeIcon';
@@ -15,22 +15,60 @@ interface FileItemProps {
 }
 
 const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
-  const { selectedFiles, toggleFileSelection, setCurrentPath, deleteFiles, setPreviewFile, moveFile, currentPath, shareFile, files, downloadFile, renameFolder, cancelFolderCreation } = useFiles();
+  const { selectedFiles, toggleFileSelection, setCurrentPath, deleteFiles, setPreviewFile, moveFile, currentPath, shareFile, files, downloadFile, renameFolder, cancelFolderCreation, handleGlobalPreview } = useFiles();
   const isSelected = selectedFiles.includes(file.id);
   const [isDragging, setIsDragging] = useState(false);
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [clickTimeout, setClickTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  const handleClick = () => {
+  const handleClick = (e) => {
     // No permitir navegación si está en modo edición
     if (file.isEditing) {
       return;
     }
     
-    if (file.type === 'folder') {
-      setCurrentPath(file.path);
+    // Cancelar timeout anterior si existe
+    if (clickTimeout) {
+      clearTimeout(clickTimeout);
+      setClickTimeout(null);
+    }
+    
+    // Establecer nuevo timeout
+    const timeout = setTimeout(() => {
+      if (file.type === 'folder') {
+        setCurrentPath(file.path);
+      } else {
+        setPreviewFile(file);
+      }
+      setClickTimeout(null);
+    }, 250);
+    
+    setClickTimeout(timeout);
+  };
+
+  const handleDoubleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Cancelar el click simple
+    if (clickTimeout) {
+      clearTimeout(clickTimeout);
+      setClickTimeout(null);
+    }
+    
+    if (file.isEditing || file.type === 'folder') {
+      return;
+    }
+    
+    const fileInfo = getFileTypeInfo(file.name);
+    
+    // Solo hacer preview para archivos multimedia
+    if (['image', 'video', 'audio'].includes(fileInfo.category)) {
+      handleGlobalPreview(file);
     } else {
-      setPreviewFile(file);
+      // Para otros archivos, descargar
+      downloadFile(file.id);
     }
   };
 
@@ -204,6 +242,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
               isDragging ? 'opacity-50 scale-95' : ''
             }`}
             onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
             draggable
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
@@ -265,6 +304,12 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
               Download
             </ContextMenuItem>
           )}
+          {file.type === 'file' && ['image', 'video', 'audio'].includes(getFileTypeInfo(file.name).category) && (
+            <ContextMenuItem onClick={() => handleGlobalPreview(file)} className="text-cyber-blue hover:bg-cyber-blue/10">
+              <Eye className="w-4 h-4 mr-2" />
+              Preview
+            </ContextMenuItem>
+          )}
           <ContextMenuSeparator className="bg-cyber-blue/20" />
           <ContextMenuItem onClick={handleDelete} className="text-red-400 hover:bg-red-500/10">
             <Trash className="w-4 h-4 mr-2" />
@@ -286,6 +331,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
             isDragging ? 'opacity-50 scale-95' : ''
           }`}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           draggable
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -335,6 +381,12 @@ const FileItem: React.FC<FileItemProps> = ({ file, viewMode }) => {
           <ContextMenuItem onClick={handleDownload} className="text-foreground hover:bg-cyber-blue/10">
             <Download className="w-4 h-4 mr-2" />
             Download
+          </ContextMenuItem>
+        )}
+        {file.type === 'file' && ['image', 'video', 'audio'].includes(getFileTypeInfo(file.name).category) && (
+          <ContextMenuItem onClick={() => handleGlobalPreview(file)} className="text-cyber-blue hover:bg-cyber-blue/10">
+            <Eye className="w-4 h-4 mr-2" />
+            Preview
           </ContextMenuItem>
         )}
         <ContextMenuSeparator className="bg-cyber-blue/20" />

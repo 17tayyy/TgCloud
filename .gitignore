@@ -203,3 +203,7 @@ FakesAssemblies/
 
 # Visual Studio 6 workspace options file
 *.opt
+
+# Changes
+changes.sh
+reporte_cambios.txt

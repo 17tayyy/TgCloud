@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useFiles } from '@/contexts/FileContext';
+import { useFiles, getFileTypeInfo } from '@/contexts/FileContext';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { Button } from '@/components/ui/button';
-import { Upload, FolderPlus, Download, Trash, X, CheckSquare, Square } from 'lucide-react';
+import { Upload, FolderPlus, Download, Trash, X, CheckSquare, Square, Eye } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import Header from './Header';
 import Breadcrumbs from './Breadcrumbs';
@@ -26,7 +26,16 @@ const Dashboard = () => {
     clearSelection, 
     selectAllFiles,
     deleteFiles, 
-    downloadMultipleFiles 
+    downloadMultipleFiles,
+    handleGlobalPreview,
+    toggleFileSelection,
+    setCurrentPath,
+    setPreviewFile,
+    moveFile,
+    shareFile,
+    downloadFile,
+    renameFolder,
+    cancelFolderCreation
   } = useFiles();
   const [showStatsPage, setShowStatsPage] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -239,6 +248,19 @@ const Dashboard = () => {
                 <FolderPlus className="w-4 h-4 mr-2" />
                 Create Folder
               </ContextMenuItem>
+
+              {previewFile && ['image', 'video', 'audio'].includes(getFileTypeInfo(previewFile.name).category) && (
+                <>
+                  <ContextMenuSeparator className="bg-cyber-blue/20" />
+                  <ContextMenuItem 
+                    onClick={() => handleGlobalPreview(previewFile)}
+                    className="text-cyber-blue hover:bg-cyber-blue/10"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Preview File
+                  </ContextMenuItem>
+                </>
+              )}
               
               {currentFiles.length > 0 && (
                 <>

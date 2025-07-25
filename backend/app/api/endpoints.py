@@ -64,6 +64,8 @@ async def list_files(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Return all fthe files from de Database"""
+    
     return get_all_files(db)
 
 @router.get("/folders/{foldername}/files/", response_model=List[FileResponse])
@@ -72,6 +74,8 @@ async def list_files_in_folder(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Return all the files in the specified folder"""
+    
     validate_names(foldername)
 
     return get_files_in_folder(db, foldername)
@@ -83,6 +87,8 @@ async def get_file_info(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Return information about the specified file"""
+
     validate_names(foldername, filename)
 
     file = get_file_by_filename(db, filename, foldername)
@@ -100,23 +106,25 @@ async def download_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    
+    """Download the file from telegram to the server.
+    When downloaded it gives the file to the user,
+    to be downloaded in the browser"""
+
     operation_id = str(uuid.uuid4())
     
-    try:
-        print(f"Download request: foldername={foldername}, filename={filename}, user={current_user.username}")
-        
-        await ensure_telegram_ready()
+    try:        
+        await ensure_telegram_ready() # Make sure that telegram session is correctly running
         validate_names(foldername, filename)
 
         file_db = get_file_by_filename(db, filename, foldername)
         if not file_db:
-            print(f"File not found in database: {filename} in {foldername}")
             raise FileNotFoundException(filename)
 
         if file_db.encrypted and not current_user.encryption_enabled:
             return {"detail": "This file is encrypted. Please enable encryption in your account to download it."}
 
-        print(f"Starting download progress tracking for operation {operation_id}")
+        # Start tracking the download progress
         await progress_manager.update_progress(operation_id, current_user.username, {
             'progress': 0,
             'status': 'starting',
@@ -127,6 +135,8 @@ async def download_file(
         })
 
         async def progress_callback(current, total):
+            """Update the progress of the download operation"""
+
             if total is None or total == 0:
                 estimated_progress = min(int((current / (10 * 1024 * 1024)) * 80), 85)
                 await progress_manager.update_progress(
@@ -155,28 +165,27 @@ async def download_file(
                     }
                 )
 
-        print(f"Calling download_file_from_tgcloud...")
         result = await download_file_from_tgcloud(filename, foldername, db, progress_callback)
         
         if not result or not result[0]:
-            print(f"Download failed - no result returned")
             await progress_manager.complete_operation(operation_id, current_user.username, False)
             raise FileNotFoundException(filename)
         
-        print(f"Download completed successfully")
+        # Download completed successfully
         await progress_manager.complete_operation(operation_id, current_user.username, True)
         
         download_path, original_name = result
-        print(f"Download path: {download_path}, original name: {original_name}")
         
-        background_tasks.add_task(remove_file_from_disk, download_path)
+        background_tasks.add_task(remove_file_from_disk, download_path) # Remove the file from disk after serving it
         
+        # Create a FastAPIFileResponse to serve the file
         response = FastAPIFileResponse(
             path=download_path,
             filename=original_name,
             media_type="application/octet-stream"
         )
         
+        # Set CORS headers for the response
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "*"
@@ -185,12 +194,12 @@ async def download_file(
         return response
     
     except Exception as e:
-        print(f"Error in download_file: {str(e)}")
         await progress_manager.complete_operation(operation_id, current_user.username, False)
         raise e
 
 @router.options("/folders/{foldername}/files/{filename}/download")
 async def download_file_options(foldername: str, filename: str):
+    """Handle CORS preflight requests for file download"""
     response = JSONResponse(content={})
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
@@ -205,7 +214,10 @@ async def upload_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    operation_id = str(uuid.uuid4())
+    
+    """Upload a file to the specified folder in TgCloud."""
+
+    operation_id = str(uuid.uuid4()) # Generate a unique operation ID for tracking progress
     
     try:
 
@@ -219,6 +231,7 @@ async def upload_file(
         if not folder_exists:
             raise FolderNotFoundException(foldername)
         
+        # Start tracking the upload progress
         await progress_manager.update_progress(operation_id, current_user.username, {
             'progress': 0,
             'status': 'starting',
@@ -231,12 +244,14 @@ async def upload_file(
         safe_filename = os.path.basename(file.filename)
         file_location = os.path.join(UPLOAD_DIR, safe_filename)
 
+        # Save the uploaded file to disk
         file_size = 0
         with open(file_location, "wb") as buffer:
             while chunk := await file.read(8192):
                 buffer.write(chunk)
                 file_size += len(chunk)
         
+        # Update progress after saving the file
         await progress_manager.update_progress(operation_id, current_user.username, {
             'progress': 25,
             'status': 'uploading_to_telegram',
@@ -247,6 +262,8 @@ async def upload_file(
         })
 
         async def progress_callback(current, total):
+            """Update the progress of the upload operation"""
+
             if total is None or total == 0:
                 estimated_progress = min(25 + int((current / (10 * 1024 * 1024)) * 60), 85)
                 await progress_manager.update_progress(
@@ -275,6 +292,7 @@ async def upload_file(
                     }
                 )
 
+        # Upload the file to TgCloud
         db_file = await upload_file_to_tgcloud(
             file_location,
             folder=foldername,
@@ -287,8 +305,10 @@ async def upload_file(
             await progress_manager.complete_operation(operation_id, current_user.username, False)
             raise FileUploadException("Could not save file to TgCloud")
         
+        # Update progress to completed
         await progress_manager.complete_operation(operation_id, current_user.username, True)
         
+        # Prepare the response with file details
         file_response = {
             "id": db_file.id,
             "folder": db_file.folder,
@@ -300,6 +320,7 @@ async def upload_file(
             "uploaded_at": db_file.uploaded_at
         }
         
+        # Return the operation ID and file details
         return {
             "operation_id": operation_id,
             "file": file_response,
@@ -320,6 +341,72 @@ async def upload_file(
         else:
             raise FileUploadException(f"Upload failed: {error_message}")
 
+@router.get("/folders/{foldername}/files/{filename}/preview")
+async def preview_file(
+    foldername: str,
+    filename: str,
+    background_tasks: BackgroundTasks,
+    token: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Preview a file from the specified folder in TgCloud."""
+
+    try:
+        await ensure_telegram_ready()
+        validate_names(foldername, filename)
+
+        file_db = get_file_by_filename(db, filename, foldername)
+        if not file_db:
+            raise FileNotFoundException(filename)
+
+        if file_db.encrypted and not current_user.encryption_enabled:
+            raise FileUploadException("This file is encrypted. Please enable encryption to preview it.")
+
+        result = await download_file_from_tgcloud(filename, foldername, db, None)
+        
+        if not result or not result[0]:
+            raise FileNotFoundException(filename)
+        
+        download_path, original_name = result
+        
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(original_name)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+        
+        background_tasks.add_task(remove_file_from_disk, download_path)
+        
+        response = FastAPIFileResponse(
+            path=download_path,
+            filename=original_name,
+            media_type=mime_type
+        )
+        
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Disposition, Content-Type"
+        
+        if mime_type.startswith(('image/', 'video/', 'audio/', 'text/', 'application/pdf')):
+            response.headers["Content-Disposition"] = f'inline; filename="{original_name}"'
+        else:
+            response.headers["Content-Disposition"] = f'attachment; filename="{original_name}"'
+        
+        return response
+        
+    except Exception as e:
+        raise FileUploadException(f"Preview failed: {str(e)}")
+
+@router.options("/folders/{foldername}/files/{filename}/preview")
+async def preview_file_options(foldername: str, filename: str):
+    response = JSONResponse(content={})
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
 @router.delete("/folders/{foldername}/files/{filename}", response_model=MessageResponse)
 async def delete_file(
     foldername: str,
@@ -327,6 +414,7 @@ async def delete_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Delete a file from the specified folder in TgCloud."""
     await ensure_telegram_ready()
     validate_names(foldername, filename)
 
@@ -361,6 +449,7 @@ async def create_folder(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Create a new folder in TgCloud."""
     validate_names(folder_data.folder)
 
     folder = get_folder_by_name(db, folder_data.folder)
@@ -380,6 +469,7 @@ async def list_folders(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Return all folders from TgCloud."""
     return get_all_folders(db)
 
 @router.delete("/folders/{foldername}/", response_model=MessageResponse)
@@ -388,6 +478,8 @@ async def delete_folder(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Delete a folder from TgCloud."""
+    await ensure_telegram_ready()
     validate_names(foldername)
 
     folder = get_folder_by_name(db, foldername)
@@ -412,6 +504,7 @@ async def rename_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Rename a file in the specified folder in TgCloud."""
     validate_names(foldername, filename, data.new_name)
 
     file = get_file_by_filename(db, filename, foldername)
@@ -436,6 +529,7 @@ async def rename_folder(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Rename a folder in TgCloud."""
     validate_names(foldername, data.new_name)
 
     folder = get_folder_by_name(db, foldername)
@@ -463,6 +557,8 @@ async def move_file(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Move a file from one folder to another in TgCloud."""
+
     validate_names(foldername, filename, data.dest_folder)
 
     dest_folder = get_folder_by_name(db, data.dest_folder)
@@ -521,6 +617,7 @@ async def get_stats(
 
 @router.post("/register", response_model=MessageResponse)
 async def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user in TgCloud."""
     existing = get_user(user.username, db)
     if existing:
         raise UsernameAlreadyExists(user.username)
@@ -537,6 +634,7 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/token", response_model=TokenResponse)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Authenticate user and return access token."""
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise IncorrectLoginException()
@@ -548,6 +646,7 @@ async def enable_encryption(
     db: Session = Depends(get_db),
     current_user= Depends(get_current_user)
 ):
+    """Enable encryption for the current user's account."""
     current_user.encryption_enabled = True
     db.commit()
     db.refresh(current_user)
@@ -558,6 +657,7 @@ async def disable_encryption(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+    """Disable encryption for the current user's account."""
     current_user.encryption_enabled = False
 
     db.commit()
@@ -571,11 +671,16 @@ async def share_file(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
+    """Share a file from the specified folder in TgCloud."""
+    validate_names(foldername, filename)
+
     file = get_file_by_filename(db, filename, foldername)
     if not file:
         raise FileNotFoundException(filename)
     
     expires_at = datetime.now() + timedelta(minutes=SHARE_TOKEN_EXPIRE_MINUTES)
+    
+    # Create a share token for the file
     token = create_access_token(
         data={
             "folder": foldername,
@@ -585,6 +690,8 @@ async def share_file(
         },
         expires_delta=timedelta(minutes=SHARE_TOKEN_EXPIRE_MINUTES)
     )
+
+    # Store the share token in the database
     db_token = ShareToken(
         token=token,
         type="file",
@@ -593,7 +700,6 @@ async def share_file(
         owner=current_user.username,
         expires_at=expires_at
     )
-
     db.add(db_token)
     db.commit()
 
@@ -606,6 +712,10 @@ async def share_folder(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Share a folder from TgCloud."""
+    
+    validate_names(foldername)
+
     folder = get_folder_by_name(db, foldername)
     if not folder:
         raise FolderNotFoundException(foldername)
@@ -619,6 +729,7 @@ async def share_folder(
         },
         expires_delta=timedelta(minutes=SHARE_TOKEN_EXPIRE_MINUTES)
     )
+
     db_token = ShareToken(
         token=token,
         type="folder",
@@ -639,6 +750,8 @@ async def access_shared_file_info(
     token: str,
     db: Session = Depends(get_db),
 ):
+    """Access shared file information using a share token."""
+
     payload, db_token = validate_share_token(db, token, "file")
     folder = payload["folder"]
     filename = payload["filename"]
@@ -653,7 +766,9 @@ async def download_shared_file(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
+    """Download a shared file using a share token."""
     await ensure_telegram_ready()
+
     payload, db_token = validate_share_token(db, token, "file")
     folder = payload["folder"]
     filename = payload["filename"]
@@ -668,12 +783,14 @@ async def download_shared_file(
     download_path, original_name = result
     background_tasks.add_task(remove_file_from_disk, download_path)
     
+    # Create a FastAPIFileResponse to serve the file
     response = FastAPIFileResponse(
         path=download_path,
         filename=original_name,
         media_type="application/octet-stream"
     )
     
+    # Set CORS headers for the response
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "*"
@@ -686,6 +803,7 @@ async def access_shared_folder_info(
     token: str,
     db: Session = Depends(get_db)
 ):
+    """Access shared folder information using a share token."""
     payload, db_token = validate_share_token(db, token, "folder")
     folder = payload["folder"]
     files = get_files_in_folder(db, folder)
@@ -698,6 +816,7 @@ async def download_file_from_shared_folder(
     filename: str,
     db: Session = Depends(get_db)
 ):
+    """Download a file from a shared folder using a share token."""
     await ensure_telegram_ready()
     payload, db_token = validate_share_token(db, token, "folder")
     folder = payload["folder"]
@@ -731,6 +850,7 @@ async def revoke_share_token(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    """Revoke a share token."""
     db_token = get_share_token(token, current_user.username, db)
     if not db_token:
         raise TokenNotFoundException()
@@ -742,6 +862,10 @@ async def revoke_share_token(
 
 @router.post("/tgcloud/auth/phone", response_model=MessageResponse)
 async def tgcloud_send_phone(data: PhoneRequest):
+    """Send a code to the user's phone number for Telegram authentication."""
+    if not settings.TG_API_ID or not settings.TG_API_HASH:
+        return {"message": "Telegram API credentials not configured"}
+    
     try:
         await telegram_client.connect()
         await telegram_client.send_code_request(data.phone)
@@ -751,6 +875,10 @@ async def tgcloud_send_phone(data: PhoneRequest):
 
 @router.post("/tgcloud/auth/verify_code", response_model=MessageResponse)
 async def tgcloud_verify_code(data: CodeRequest):
+    """Verify the code sent to the user's phone number for Telegram authentication."""
+    if not settings.TG_API_ID or not settings.TG_API_HASH:
+        return {"message": "Telegram API credentials not configured"}
+    
     try:
         await telegram_client.connect()
         await telegram_client.sign_in(data.phone, data.code)
@@ -764,6 +892,10 @@ async def tgcloud_verify_code(data: CodeRequest):
 
 @router.post("/tgcloud/auth/password", response_model=MessageResponse)
 async def tgcloud_send_password(data: PasswordRequest):
+    """Send a password for Telegram authentication."""
+    if not settings.TG_API_ID or not settings.TG_API_HASH:
+        return {"message": "Telegram API credentials not configured"}
+    
     try:
         await telegram_client.connect()
         await telegram_client.sign_in(password=data.password)
@@ -773,6 +905,10 @@ async def tgcloud_send_password(data: PasswordRequest):
 
 @router.get("/tgcloud/auth/status", response_model=MessageResponse)
 async def tgcloud_auth_status():
+    """Check the authentication status of the Telegram client."""
+    if not settings.TG_API_ID or not settings.TG_API_HASH:
+        return {"message": "Telegram API credentials not configured"}
+    
     try:
         await telegram_client.connect()
         if await telegram_client.is_user_authorized():
@@ -784,6 +920,7 @@ async def tgcloud_auth_status():
 
 @router.get("/tgcloud/config/check", response_model=MessageResponse)
 async def check_telegram_config():
+    """Check if Telegram API credentials are configured."""
     try:
         if not settings.TG_API_ID or not settings.TG_API_HASH:
             return {"message": "Telegram API credentials not configured"}

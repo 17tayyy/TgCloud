@@ -49,6 +49,12 @@ interface FileContextType {
   shareFile: (fileId: string) => Promise<string>;
   downloadFile: (fileId: string) => Promise<void>;
   downloadMultipleFiles: (fileIds: string[]) => Promise<void>;
+  showPreviewModal: boolean;
+  setShowPreviewModal: (show: boolean) => void;
+  previewUrl: string | null;
+  setPreviewUrl: (url: string | null) => void;
+  isLoadingPreview: boolean;
+  handleGlobalPreview: (file: FileItem) => Promise<void>;
 }
 
 // Export utility function for file type detection
@@ -131,6 +137,9 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   
   // Hook de progreso
   const { connect, disconnect, isConnected } = useProgressTracker();
@@ -502,6 +511,28 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Función global para preview (añadir después de las otras funciones)
+  const handleGlobalPreview = async (file: FileItem) => {
+    setPreviewFile(file);
+    setIsLoadingPreview(true);
+    setPreviewUrl(null);
+    
+    try {
+      const folderName = currentPath.substring(1);
+      const url = await filesAPI.preview(folderName, file.name);
+      setPreviewUrl(url);
+      setShowPreviewModal(true);
+    } catch (error) {
+      toast({
+        title: "Preview failed", 
+        description: "Could not load file preview",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
   return (
     <FileContext.Provider value={{
       files,
@@ -527,7 +558,13 @@ export const FileProvider: React.FC<{ children: React.ReactNode }> = ({ children
       downloadFile,
       loadData,
       shareFile,
-      downloadMultipleFiles
+      downloadMultipleFiles,
+      showPreviewModal,
+      setShowPreviewModal,
+      previewUrl,
+      setPreviewUrl,
+      isLoadingPreview,
+      handleGlobalPreview
     }}>
       {children}
     </FileContext.Provider>

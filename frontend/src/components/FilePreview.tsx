@@ -1,16 +1,17 @@
-
 import React, { useState } from 'react';
 import { FileItem, useFiles, getFileTypeInfo } from '@/contexts/FileContext';
 import { Button } from '@/components/ui/button';
-import { X, Download, Trash, File, Image, Music, Video, FileText } from 'lucide-react';
+import { X, Download, Trash, File, Image, Music, Video, FileText, Eye } from 'lucide-react';
 import { formatFileSize, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import FileTypeIcon from './FileTypeIcon';
 import { ConfirmDialog } from './ConfirmDialog';
+import { filesAPI } from '@/services/api';
 
 const FilePreview = () => {
-  const { previewFile, setPreviewFile, deleteFiles, downloadFile } = useFiles();
+  const { previewFile, setPreviewFile, deleteFiles, downloadFile, currentPath, showPreviewModal, setShowPreviewModal, previewUrl, setPreviewUrl, isLoadingPreview, handleGlobalPreview } = useFiles();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!previewFile) return null;
 
@@ -22,6 +23,12 @@ const FilePreview = () => {
     setShowDeleteConfirm(true);
   };
 
+  const handlePreview = async () => {
+    if (previewFile) {
+      await handleGlobalPreview(previewFile);
+    }
+  }
+  
   const confirmDelete = () => {
     deleteFiles([previewFile.id]);
     setPreviewFile(null);
@@ -117,6 +124,23 @@ const FilePreview = () => {
             <Trash className="w-4 h-4 mr-2" />
             Delete
           </Button>
+          <Button
+            onClick={handlePreview}
+            disabled={isLoadingPreview}
+            className="w-full bg-cyber-blue/20 border-cyber-blue/50 text-cyber-blue hover:bg-cyber-blue/30 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoadingPreview ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyber-blue mr-2"></div>
+                Loading...
+              </>
+            ) : (
+              <>
+                <Eye className="w-4 h-4 mr-2" />
+                Load Preview
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
@@ -130,6 +154,78 @@ const FilePreview = () => {
         cancelText="Cancel"
         variant="destructive"
       />
+
+      {/* Modal de Preview */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-cyber-dark-card border border-cyber-blue/30 rounded-lg max-w-4xl max-h-[90vh] overflow-auto relative shadow-2xl">
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 border-b border-cyber-blue/30 sticky top-0 bg-cyber-dark-card z-10">
+              <h3 className="text-lg font-semibold truncate text-cyber-blue">{previewFile.name}</h3>
+              <Button
+                variant="ghost"
+                onClick={() => setShowPreviewModal(false)}
+                className="p-2 hover:bg-cyber-blue/20 rounded-full text-cyber-blue/70 hover:text-cyber-blue"
+              >
+                <X size={20} />
+              </Button>
+            </div>
+            
+            {/* Preview Content */}
+            <div className="p-6 flex justify-center items-center min-h-[300px] bg-cyber-dark-card">
+              {isLoading ? (
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyber-blue"></div>
+                  <p className="text-cyber-blue/70">Loading preview...</p>
+                </div>
+              ) : (
+                (() => {
+                  const fileInfo = getFileTypeInfo(previewFile.name);
+                  
+                  switch (fileInfo.category) {
+                    case 'image':
+                      return (
+                        <img 
+                          src={previewUrl || ''} 
+                          alt={previewFile.name}
+                          className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg border border-cyber-blue/20"
+                        />
+                      );
+                    case 'video':
+                      return (
+                        <video 
+                          src={previewUrl || ''} 
+                          controls 
+                          className="max-w-full max-h-[70vh] rounded-lg shadow-lg border border-cyber-blue/20"
+                        />
+                      );
+                    case 'audio':
+                      return (
+                        <div className="flex flex-col items-center space-y-4 p-8">
+                          <div className="text-6xl text-cyber-blue">🎵</div>
+                          <audio 
+                            src={previewUrl || ''} 
+                            controls 
+                            className="w-full max-w-md bg-cyber-dark border border-cyber-blue/30 rounded-lg"
+                          />
+                          <p className="text-cyber-blue/70 text-center">{previewFile.name}</p>
+                        </div>
+                      );
+                    default:
+                      return (
+                        <div className="text-center p-8">
+                          <div className="text-6xl mb-4 text-cyber-blue/50">📁</div>
+                          <p className="text-cyber-blue/70">Preview not available for this file type</p>
+                          <p className="text-muted-foreground text-sm mt-2">{previewFile.name}</p>
+                        </div>
+                      );
+                  }
+                })()
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
