@@ -61,7 +61,8 @@ class TgCloudManager:
             "NODE_ENV": "production",
             "LOG_LEVEL": "INFO",
             "MAX_FILE_SIZE": "100MB",
-            "SESSION_EXPIRE_HOURS": "24"
+            "SESSION_EXPIRE_HOURS": "24",
+            "DB_PATH": "/app/data"
         }
     
     def _generate_secret(self) -> str:
@@ -406,6 +407,7 @@ Management Commands:
         config["HOST"] = "localhost"
         config["NODE_ENV"] = "development"
         config["WEB_PORT"] = "8080"  # Development frontend port
+        config["DB_PATH"] = "./backend/data"  # Local data directory for development
         self._save_config(config)
         
         if not self._validate_telegram_config(config):

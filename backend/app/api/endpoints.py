@@ -8,8 +8,8 @@ from app.core.config import settings
 from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError
 from telethon.sessions import StringSession
 from app.client.client import telegram_client, ensure_telegram_ready
-from backend.app.core.db import get_db
-from backend.app.core.files import human_readable_size
+from app.core.db import get_db
+from app.core.files import human_readable_size
 from app.services.progress_service import progress_manager
 import uuid
 from app.services.file_service import (

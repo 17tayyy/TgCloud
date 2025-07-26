@@ -31,7 +31,10 @@ class Settings:
     
     # File Configuration
     MAX_FILE_SIZE = os.getenv("MAX_FILE_SIZE", "100MB")
-    DB_PATH = os.getenv("DB_PATH", "/app/data")
+    
+    # Database path - use different defaults for dev vs production
+    _default_db_path = "./data" if DEV else "/app/data"
+    DB_PATH = os.getenv("DB_PATH", _default_db_path)
     
     # Session Configuration  
     SESSION_EXPIRE_HOURS = int(os.getenv("SESSION_EXPIRE_HOURS", 24))

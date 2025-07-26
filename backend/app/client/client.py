@@ -12,13 +12,23 @@ from app.utils.encryption import encrypt_file, decrypt_file
 
 # Use configurable paths
 BASE_DIR = Path(__file__).parent.parent.parent
-SESSION_DIR = Path(settings.DB_PATH) if hasattr(settings, 'DB_PATH') and settings.DB_PATH else BASE_DIR
+if hasattr(settings, 'DB_PATH') and settings.DB_PATH:
+    SESSION_DIR = Path(settings.DB_PATH).resolve()
+else:
+    SESSION_DIR = BASE_DIR / "data"
+
 SESSION_FILE = SESSION_DIR / "tgcloud_session.session"
 DOWNLOADS_DIR = BASE_DIR / "downloaded_files"
 
 # Ensure directories exist
-SESSION_DIR.mkdir(parents=True, exist_ok=True)
-DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+except PermissionError as e:
+    print(f"Warning: Could not create directory {SESSION_DIR}: {e}")
+    # Fallback to current directory
+    SESSION_DIR = BASE_DIR
+    SESSION_FILE = SESSION_DIR / "tgcloud_session.session"
 
 telegram_client = TelegramClient(str(SESSION_FILE.with_suffix('')), settings.TG_API_ID, settings.TG_API_HASH)
 chat_id = settings.TG_CHAT_ID
