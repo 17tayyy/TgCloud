@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from app.auth.jwt_auth import create_access_token, decode_access_token
 from datetime import datetime, timedelta
 from app.client.files_db import File, Folder, User, ShareToken
-from app.exceptions import BadNameException
+from app.core.errors import ValidationError
 import re
 
 INVALID_CHARS = re.compile(r'[\\/:"*?<>|]')
@@ -80,4 +80,4 @@ def get_share_token(token: str, owner: str, db: Session):
 def validate_names(*names):
     for name in names:
         if INVALID_CHARS.search(name):
-            raise BadNameException(name)
+            raise ValidationError(f"Invalid characters in name: {name}", "name")

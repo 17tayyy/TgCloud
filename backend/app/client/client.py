@@ -1,31 +1,38 @@
 import os
+from pathlib import Path
 from telethon.tl.types import DocumentAttributeFilename
 from .files_db import SessionLocal, File, Folder, User
 from datetime import datetime
 import re
 from app.core.config import settings
 from sqlalchemy.orm import Session
-from app.exceptions import TelegramNotAuthorized
+from app.core.errors import ExternalServiceError
 from telethon import TelegramClient
 from app.utils.encryption import encrypt_file, decrypt_file
 
-telegram_client = TelegramClient("tgcloud_session", settings.TG_API_ID, settings.TG_API_HASH)
-chat_id = settings.TG_CHAT_ID
+# Use configurable paths
+BASE_DIR = Path(__file__).parent.parent.parent
+SESSION_DIR = Path(settings.DB_PATH) if hasattr(settings, 'DB_PATH') and settings.DB_PATH else BASE_DIR
+SESSION_FILE = SESSION_DIR / "tgcloud_session.session"
+DOWNLOADS_DIR = BASE_DIR / "downloaded_files"
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DOWNLOADS_DIR = os.path.join(BASE_DIR, "downloaded_files")
+# Ensure directories exist
+SESSION_DIR.mkdir(parents=True, exist_ok=True)
+DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+telegram_client = TelegramClient(str(SESSION_FILE.with_suffix('')), settings.TG_API_ID, settings.TG_API_HASH)
+chat_id = settings.TG_CHAT_ID
 
 
 async def ensure_telegram_ready():
     if not telegram_client.is_connected():
         await telegram_client.connect()
 
-    session_file = "./tgcloud_session.session"
-    if not os.path.exists(session_file):
-        raise TelegramNotAuthorized()
+    if not SESSION_FILE.exists():
+        raise ExternalServiceError("Telegram", "Not authorized")
     
     if not await telegram_client.is_user_authorized():
-        raise TelegramNotAuthorized()
+        raise ExternalServiceError("Telegram", "Not authorized")
     
 async def upload_file_to_tgcloud(file_path: str, folder: str = "default", db_session: Session = None, username: str = None, progress_callback=None):
     close_db = False
@@ -132,12 +139,12 @@ async def download_file_from_tgcloud(filename: str, folder: str ="default", db_s
             db_session.close()
         return None, None
 
-    os.makedirs(DOWNLOADS_DIR, exist_ok=True)
-    download_path = os.path.join(DOWNLOADS_DIR, db_file.filename)
+    DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    download_path = DOWNLOADS_DIR / db_file.filename
     
     await telegram_client.download_file(
         message.document,
-        file=download_path,
+        file=str(download_path),
         part_size_kb=1024*2,
         progress_callback=progress_callback
     )

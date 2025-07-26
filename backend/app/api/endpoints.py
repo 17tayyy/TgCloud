@@ -8,8 +8,8 @@ from app.core.config import settings
 from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError
 from telethon.sessions import StringSession
 from app.client.client import telegram_client, ensure_telegram_ready
-from app.dependencies.db import get_db
-from app.dependencies.files import human_readable_size
+from backend.app.core.db import get_db
+from backend.app.core.files import human_readable_size
 from app.services.progress_service import progress_manager
 import uuid
 from app.services.file_service import (
@@ -30,18 +30,14 @@ from app.services.file_service import (
     validate_share_token,
     get_share_token,
 )
-from app.exceptions import (
-    FileNotFoundException,
-    FileUploadException,
-    FolderAlreadyExistsException,
-    BadNameException,
-    FolderNotFoundException,
-    FolderNotDeletedException,
-    FileAlreadyExistsException,
-    IncorrectLoginException,
-    UsernameAlreadyExists,
-    TokenNotFoundException,
-    TelegramNotAuthorized,
+from app.core.errors import (
+    NotFoundError,
+    ValidationError,
+    ConflictError,
+    AuthenticationError,
+    AuthorizationError,
+    ExternalServiceError,
+    TgCloudError,
 )
 from typing import List
 import shutil
@@ -94,7 +90,7 @@ async def get_file_info(
     file = get_file_by_filename(db, filename, foldername)
 
     if not file:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
     
     return file
 
@@ -119,7 +115,7 @@ async def download_file(
 
         file_db = get_file_by_filename(db, filename, foldername)
         if not file_db:
-            raise FileNotFoundException(filename)
+            raise NotFoundError("File", filename)
 
         if file_db.encrypted and not current_user.encryption_enabled:
             return {"detail": "This file is encrypted. Please enable encryption in your account to download it."}
@@ -169,7 +165,7 @@ async def download_file(
         
         if not result or not result[0]:
             await progress_manager.complete_operation(operation_id, current_user.username, False)
-            raise FileNotFoundException(filename)
+            raise NotFoundError("File", filename)
         
         # Download completed successfully
         await progress_manager.complete_operation(operation_id, current_user.username, True)
@@ -222,14 +218,14 @@ async def upload_file(
     try:
 
         if not telegram_client.is_connected():
-            raise TelegramNotAuthorized()
+            raise ExternalServiceError("Telegram", "Not authorized")
 
         await ensure_telegram_ready()
         validate_names(foldername)
 
         folder_exists = get_folder_by_name(db, foldername)
         if not folder_exists:
-            raise FolderNotFoundException(foldername)
+            raise NotFoundError("Folder", foldername)
         
         # Start tracking the upload progress
         await progress_manager.update_progress(operation_id, current_user.username, {
@@ -303,7 +299,7 @@ async def upload_file(
 
         if not db_file:
             await progress_manager.complete_operation(operation_id, current_user.username, False)
-            raise FileUploadException("Could not save file to TgCloud")
+            raise TgCloudError("Could not save file to TgCloud", "FILE_UPLOAD_ERROR")
         
         # Update progress to completed
         await progress_manager.complete_operation(operation_id, current_user.username, True)
@@ -333,13 +329,13 @@ async def upload_file(
         
         error_message = str(e)
         if "PhotoInvalidDimensionsError" in error_message:
-            raise FileUploadException("Invalid image file. Please try a different image format or size.")
+            raise TgCloudError("Invalid image file. Please try a different image format or size.", "FILE_UPLOAD_ERROR")
         elif "TelegramNotAuthorized" in error_message:
-            raise FileUploadException("Telegram not authorized. Please connect your Telegram account first.")
+            raise TgCloudError("Telegram not authorized. Please connect your Telegram account first.", "FILE_UPLOAD_ERROR")
         elif "FileTooBigError" in error_message:
-            raise FileUploadException("File is too large. Maximum file size is 2GB.")
+            raise TgCloudError("File is too large. Maximum file size is 2GB.", "FILE_UPLOAD_ERROR")
         else:
-            raise FileUploadException(f"Upload failed: {error_message}")
+            raise TgCloudError(f"Upload failed: {error_message}", "FILE_UPLOAD_ERROR")
 
 @router.get("/folders/{foldername}/files/{filename}/preview")
 async def preview_file(
@@ -358,15 +354,15 @@ async def preview_file(
 
         file_db = get_file_by_filename(db, filename, foldername)
         if not file_db:
-            raise FileNotFoundException(filename)
+            raise NotFoundError("File", filename)
 
         if file_db.encrypted and not current_user.encryption_enabled:
-            raise FileUploadException("This file is encrypted. Please enable encryption to preview it.")
+            raise TgCloudError("This file is encrypted. Please enable encryption to preview it.", "FILE_UPLOAD_ERROR")
 
         result = await download_file_from_tgcloud(filename, foldername, db, None)
         
         if not result or not result[0]:
-            raise FileNotFoundException(filename)
+            raise NotFoundError("File", filename)
         
         download_path, original_name = result
         
@@ -396,7 +392,7 @@ async def preview_file(
         return response
         
     except Exception as e:
-        raise FileUploadException(f"Preview failed: {str(e)}")
+        raise TgCloudError(f"Preview failed: {str(e)}", "PREVIEW_ERROR")
 
 @router.options("/folders/{foldername}/files/{filename}/preview")
 async def preview_file_options(foldername: str, filename: str):
@@ -420,15 +416,15 @@ async def delete_file(
 
     folder = get_folder_by_name(db, foldername)
     if not folder:
-        raise FolderNotFoundException(foldername)
+        raise NotFoundError("Folder", foldername)
     
     file_db = get_file_by_filename(db, filename, foldername)
     if not file_db:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
 
     deleted = await delete_file_from_tgcloud(filename, foldername, db)
     if not deleted:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
 
     if folder.file_count is not None and folder.file_count > 0:
         folder.file_count -= 1
@@ -454,7 +450,7 @@ async def create_folder(
 
     folder = get_folder_by_name(db, folder_data.folder)
     if folder:
-        raise FolderAlreadyExistsException(folder_data.folder)
+        raise ConflictError(f"Folder already exists: {folder_data.folder}", "folder")
     
     new_folder = Folder(name=folder_data.folder)
 
@@ -484,12 +480,12 @@ async def delete_folder(
 
     folder = get_folder_by_name(db, foldername)
     if not folder:
-        raise FolderNotFoundException(foldername)
+        raise NotFoundError("Folder", foldername)
     
     if folder.message_ids:
         deleted = await delete_folder_from_tgcloud(folder.name, db)
         if not deleted:
-            raise FolderNotDeletedException(foldername)
+            raise TgCloudError(f"Could not delete folder: {foldername}", "FOLDER_DELETE_ERROR")
         
     db.delete(folder)
     db.commit()
@@ -509,11 +505,11 @@ async def rename_file(
 
     file = get_file_by_filename(db, filename, foldername)
     if not file:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
     
     existing = get_file_by_filename(db, data.new_name, foldername)
     if existing:
-        raise FileAlreadyExistsException(filename, foldername)
+        raise ConflictError(f"File already exists: {filename, foldername}", "file")
     
     file.filename = data.new_name
 
@@ -534,11 +530,11 @@ async def rename_folder(
 
     folder = get_folder_by_name(db, foldername)
     if not folder:
-        raise FolderNotFoundException(foldername)
+        raise NotFoundError("Folder", foldername)
     
     existing = get_folder_by_name(db, data.new_name)
     if existing:
-        raise FolderAlreadyExistsException(data.new_name)
+        raise ConflictError(f"Folder already exists: {data.new_name}", "folder")
     
     folder.name = data.new_name
 
@@ -563,15 +559,15 @@ async def move_file(
 
     dest_folder = get_folder_by_name(db, data.dest_folder)
     if not dest_folder:
-        raise FolderNotFoundException(data.dest_folder)
+        raise NotFoundError("Folder", data.dest_folder)
     
     folder = get_folder_by_name(db, foldername)
     if not folder:
-        raise FolderNotFoundException(foldername)
+        raise NotFoundError("Folder", foldername)
     
     file = get_file_by_filename(db, filename, foldername)
     if not file:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
     
     file.folder = data.dest_folder
 
@@ -620,7 +616,7 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
     """Register a new user in TgCloud."""
     existing = get_user(user.username, db)
     if existing:
-        raise UsernameAlreadyExists(user.username)
+        raise ConflictError(f"Username already exists: {user.username}", "user")
     
     hashed_password = get_password_hash(user.password)
     new_user = User(username=user.username, hashed_password=hashed_password)
@@ -637,7 +633,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     """Authenticate user and return access token."""
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
-        raise IncorrectLoginException()
+        raise AuthenticationError("Invalid credentials")
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -676,7 +672,7 @@ async def share_file(
 
     file = get_file_by_filename(db, filename, foldername)
     if not file:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
     
     expires_at = datetime.now() + timedelta(minutes=SHARE_TOKEN_EXPIRE_MINUTES)
     
@@ -718,7 +714,7 @@ async def share_folder(
 
     folder = get_folder_by_name(db, foldername)
     if not folder:
-        raise FolderNotFoundException(foldername)
+        raise NotFoundError("Folder", foldername)
     expires_at = datetime.now() + timedelta(minutes=SHARE_TOKEN_EXPIRE_MINUTES)
 
     token = create_access_token(
@@ -757,7 +753,7 @@ async def access_shared_file_info(
     filename = payload["filename"]
     file_db = get_file_by_filename(db, filename, folder)
     if not file_db:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
     return file_db
 
 @router.get("/access/file/{token}/download")
@@ -774,11 +770,11 @@ async def download_shared_file(
     filename = payload["filename"]
     file_db = get_file_by_filename(db, filename, folder)
     if not file_db:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
     
     result = await download_file_from_tgcloud(filename, folder, db, None)
     if not result or not result[0]:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
     
     download_path, original_name = result
     background_tasks.add_task(remove_file_from_disk, download_path)
@@ -810,7 +806,7 @@ async def access_shared_folder_info(
     # Get folder info
     folder = get_folder_by_name(db, folder_name)
     if not folder:
-        raise FolderNotFoundException(folder_name)
+        raise NotFoundError("Folder", folder_name)
     
     # Get files in folder
     files = get_files_in_folder(db, folder_name)
@@ -834,11 +830,11 @@ async def download_file_from_shared_folder(
     folder = payload["folder"]
     file_db = get_file_by_filename(db, filename, folder)
     if not file_db:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
     
     result = await download_file_from_tgcloud(filename, folder, db, None)
     if not result or not result[0]:
-        raise FileNotFoundException(filename)
+        raise NotFoundError("File", filename)
     
     download_path, original_name = result
     background_tasks.add_task(remove_file_from_disk, download_path)
@@ -865,7 +861,7 @@ async def revoke_share_token(
     """Revoke a share token."""
     db_token = get_share_token(token, current_user.username, db)
     if not db_token:
-        raise TokenNotFoundException()
+        raise NotFoundError("Token", token)
     
     db_token.revoked = True
     db.commit()

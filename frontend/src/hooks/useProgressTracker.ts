@@ -25,6 +25,9 @@ export const useProgressTracker = () => {
   const pingIntervalRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
+  const baseReconnectDelay = 1000; // 1 second base delay
+  const maxReconnectDelay = 30000; // 30 seconds max delay
+  const jitterFactor = 0.1; // 10% jitter to avoid thundering herd
 
   const connect = useCallback(() => {
     const token = localStorage.getItem('tgcloud_token');
@@ -101,20 +104,33 @@ export const useProgressTracker = () => {
         }
         
         // Solo reconectar si no fue un cierre intencional y no hemos excedido los intentos
-        if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
+        if (event.code !== 1000 && event.code !== 1001 && reconnectAttemptsRef.current < maxReconnectAttempts) {
           reconnectAttemptsRef.current += 1;
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000); // Backoff exponencial
           
-          console.log(`Attempting to reconnect in ${delay}ms... (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+          // Improved backoff with jitter
+          const exponentialDelay = Math.min(
+            baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current - 1),
+            maxReconnectDelay
+          );
+          const jitter = exponentialDelay * jitterFactor * Math.random();
+          const finalDelay = exponentialDelay + jitter;
+          
+          console.log(`Attempting to reconnect in ${Math.round(finalDelay)}ms... (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
             const token = localStorage.getItem('tgcloud_token');
-            if (token) {
+            if (token && wsRef.current?.readyState !== WebSocket.OPEN) {
               connect();
             }
-          }, delay);
+          }, finalDelay);
+          
         } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
           console.log('Max reconnection attempts reached. Stopping automatic reconnection.');
+          toast({
+            title: "Connection Lost",
+            description: "Unable to reconnect to server. Please refresh the page.",
+            variant: "destructive"
+          });
         }
       };
 

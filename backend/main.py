@@ -8,17 +8,22 @@ from app.api.websocket import router as websocket_router
 from app.core.config import settings
 from app.client.files_db import init_db as init_tg_db
 from app.client.client import telegram_client
-from app.exceptions import exception_handlers
-import logging
-
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from app.core.errors import exception_handlers
+from app.core.logging import logger, setup_logging
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Setup structured logging
+    setup_logging()
+    logger.info("Starting TgCloud application", extra_fields={"version": "1.0.0"})
+    
+    # Initialize database
     init_tg_db()
+    logger.info("Database initialized successfully")
+    
     yield
+    
+    logger.info("Shutting down TgCloud application")
 
 if settings.DEV:
     app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
@@ -31,26 +36,28 @@ else:
         openapi_url=None,
     )
 
-# Middleware para agregar CORS headers a todas las respuestas (incluyendo errores)
+# Global error handling middleware
 @app.middleware("http")
-async def add_cors_headers(request: Request, call_next):
+async def error_handling_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
+        return response
     except Exception as e:
-        logger.error(f"Error in request: {str(e)}")
-        response = JSONResponse(
-            status_code=500,
-            content={"detail": "Internal server error"}
+        logger.error(
+            f"Unhandled error in request {request.url}", 
+            extra_fields={
+                "method": request.method,
+                "url": str(request.url),
+                "error": str(e)
+            },
+            exc_info=True
         )
-    
-    # Agregar headers CORS a todas las respuestas
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    response.headers["Access-Control-Expose-Headers"] = "Content-Disposition, Content-Type, Content-Length"
-    
-    return response
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "error_code": "INTERNAL_ERROR"}
+        )
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -67,10 +74,12 @@ for exc, handler in exception_handlers:
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Docker and monitoring"""
+    logger.info("Health check requested")
     return {
         "status": "healthy",
         "service": "TgCloud Backend",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "timestamp": "2025-07-26T00:00:00Z"
     }
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
